@@ -59,17 +59,17 @@ When it's time to rest, a full-screen reminder appears with postpone options and
 4. Eject the DMG and delete the DMG file
 
 **⚠️ First Launch (Unsigned App):**
+- Right-click the app in Applications folder
+- Select **"Open"** from the context menu
+- Click **"Open"** in the confirmation dialog
+- The app will now launch normally
+
+**Alternative method:**
 - Double-click the app in Applications folder
 - macOS will show "cannot be opened because the developer cannot be verified"
 - Click "Cancel"
 - Go to **System Preferences** → **Security & Privacy** → **General**
 - You'll see a message about "20-20-20" being blocked, click **"Open Anyway"**
-- Click **"Open"** in the confirmation dialog
-- The app will now launch normally
-
-**Alternative method:**
-- Right-click the app in Applications folder
-- Select **"Open"** from the context menu
 - Click **"Open"** in the confirmation dialog
 
 ### Option 2: Build from Source
