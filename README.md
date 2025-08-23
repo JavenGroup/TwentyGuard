@@ -45,10 +45,14 @@ The **20-20-20 rule** is a simple guideline to reduce eye strain: every 20 minut
 ## 📸 Screenshots
 
 ### Menu Bar Interface
-The app lives quietly in your menu bar with a custom icon and comprehensive settings.
+<img src="screenshots/menu_bar_interface.png" alt="20-20-20 Menu Bar Interface" width="500">
+
+*The app lives quietly in your menu bar with a custom icon and comprehensive settings menu.*
 
 ### Break Reminder
-When it's time to rest, a full-screen reminder appears with postpone options and keyboard shortcuts.
+<img src="screenshots/break_reminder.png" alt="20-20-20 Break Reminder" width="500">
+
+*When it's time to rest, a full-screen reminder appears with postpone options and keyboard shortcuts.*
 
 ## 🚀 Installation
 
