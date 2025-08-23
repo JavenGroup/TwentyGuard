@@ -26,7 +26,6 @@ Package.resolved
 
 # DMG files
 *.dmg
-dmg_background.png
 
 # Temporary files
 *.tmp
