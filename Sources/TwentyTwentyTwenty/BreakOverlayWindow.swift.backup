@@ -1,0 +1,123 @@
+import Cocoa
+
+protocol BreakOverlayDelegate: AnyObject {
+    func didRequestPostpone(minutes: Int)
+}
+
+class BreakOverlayWindow: NSWindow {
+    weak var breakDelegate: BreakOverlayDelegate?
+    
+    private var countdownLabel: NSTextField!
+    private var ruleLabel: NSTextField!
+    private var postpone1Button: NSButton!
+    private var postpone2Button: NSButton!
+    private var postpone5Button: NSButton!
+    
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        super.init(contentRect: screenFrame, styleMask: [.borderless], backing: .buffered, defer: false)
+        
+        setupWindow()
+        setupUI()
+    }
+    
+    convenience init() {
+        self.init(contentRect: .zero, styleMask: [], backing: .buffered, defer: false)
+    }
+    
+    private func setupWindow() {
+        level = .screenSaver
+        backgroundColor = NSColor.black.withAlphaComponent(0.9)
+        isOpaque = false
+        ignoresMouseEvents = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+    
+    private func setupUI() {
+        guard let contentView = contentView else { return }
+        
+        let containerView = NSView()
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(containerView)
+        
+        countdownLabel = NSTextField(labelWithString: "20")
+        countdownLabel.font = NSFont.systemFont(ofSize: 120, weight: .bold)
+        countdownLabel.textColor = NSColor.white
+        countdownLabel.alignment = .center
+        countdownLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        ruleLabel = NSTextField(labelWithString: """
+        屏幕使用：20 分钟
+        屏幕禁用：20 秒
+        看看远方：20 米
+        """)
+        ruleLabel.font = NSFont.systemFont(ofSize: 24)
+        ruleLabel.textColor = NSColor.white
+        ruleLabel.alignment = .center
+        ruleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        postpone1Button = NSButton(title: "推迟 1 分钟", target: self, action: #selector(postpone1ButtonClicked))
+        postpone1Button.font = NSFont.systemFont(ofSize: 18)
+        postpone1Button.translatesAutoresizingMaskIntoConstraints = false
+        
+        postpone2Button = NSButton(title: "推迟 2 分钟", target: self, action: #selector(postpone2ButtonClicked))
+        postpone2Button.font = NSFont.systemFont(ofSize: 18)
+        postpone2Button.translatesAutoresizingMaskIntoConstraints = false
+        
+        postpone5Button = NSButton(title: "推迟 5 分钟", target: self, action: #selector(postpone5ButtonClicked))
+        postpone5Button.font = NSFont.systemFont(ofSize: 18)
+        postpone5Button.translatesAutoresizingMaskIntoConstraints = false
+        
+        containerView.addSubview(countdownLabel)
+        containerView.addSubview(ruleLabel)
+        contentView.addSubview(postpone1Button)
+        contentView.addSubview(postpone2Button)
+        contentView.addSubview(postpone5Button)
+        
+        NSLayoutConstraint.activate([
+            containerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            containerView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            containerView.widthAnchor.constraint(equalToConstant: 600),
+            containerView.heightAnchor.constraint(equalToConstant: 300),
+            
+            countdownLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            countdownLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 50),
+            
+            ruleLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            ruleLabel.topAnchor.constraint(equalTo: countdownLabel.bottomAnchor, constant: 50),
+            
+            postpone1Button.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: -120),
+            postpone1Button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
+            
+            postpone2Button.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            postpone2Button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
+            
+            postpone5Button.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: 120),
+            postpone5Button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50)
+        ])
+    }
+    
+    func showOverlay() {
+        makeKeyAndOrderFront(nil)
+    }
+    
+    func hideOverlay() {
+        orderOut(nil)
+    }
+    
+    func updateCountdown(_ seconds: Int) {
+        countdownLabel.stringValue = "\(seconds)"
+    }
+    
+    @objc private func postpone1ButtonClicked() {
+        breakDelegate?.didRequestPostpone(minutes: 1)
+    }
+    
+    @objc private func postpone2ButtonClicked() {
+        breakDelegate?.didRequestPostpone(minutes: 2)
+    }
+    
+    @objc private func postpone5ButtonClicked() {
+        breakDelegate?.didRequestPostpone(minutes: 5)
+    }
+}

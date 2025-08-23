@@ -1,0 +1,736 @@
+import Cocoa
+import ServiceManagement
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusBarItem: NSStatusItem!
+    private var menu: NSMenu!
+    private var workTimer: Timer?
+    private var breakTimer: Timer?
+    private var menuUpdateTimer: Timer?
+    private var workTimeRemaining: Int = 20 * 60
+    private var breakTimeRemaining: Int = 20
+    private var timerMenuItem: NSMenuItem!
+    private var breakOverlay: BreakOverlayWindow?
+    private var loginItemMenuItem: NSMenuItem!
+    
+    // Mode settings
+    private var currentWorkDuration: Int = 20 * 60 // Default 20 minutes
+    private var currentBreakDuration: Int = 20 // Default 20 seconds
+    private var isCustomMode: Bool = false
+    private var customWorkDuration: Int = 30 * 60 // Default custom: 30 minutes
+    private var customBreakDuration: Int = 30 // Default custom: 30 seconds
+    private var modeMenuItems: [NSMenuItem] = []
+    private var workDurationMenuItems: [NSMenuItem] = []
+    private var breakDurationMenuItems: [NSMenuItem] = []
+    private var showCountdownInStatusBar: Bool = false
+    private var showCountdownMenuItem: NSMenuItem!
+    
+    // Language settings
+    private var currentLanguage: String = ""
+    private var languageMenuItems: [NSMenuItem] = []
+    
+    // Language localization dictionary
+    private var localizations: [String: [String: String]] = [
+        "zh-Hans": [
+            "screenUsage": "屏幕使用",
+            "screenBreak": "屏幕禁用",
+            "mode": "模式切换",
+            "defaultMode": "20-20-20",
+            "customMode": "自定义",
+            "settings": "设置",
+            "language": "语言",
+            "loginAtStartup": "登录时启动",
+            "showCountdown": "在菜单栏显示倒计时",
+            "testBreak": "现在休息",
+            "quit": "退出",
+            "minutes": "分钟",
+            "seconds": "秒",
+            "breakOverlayTitle": "屏幕保护时间",
+            "breakOverlayText": "20-20-20 眼部保护：看向远处 20 英尺（6 米）外的物体",
+            "breakOverlayRule": "屏幕使用 : 20 分钟\n屏幕禁用 : 20 秒\n看看远方 : 20 米",
+            "postpone1": "推迟 1 分钟 (⌘1)",
+            "postpone2": "推迟 2 分钟 (⌘2)",
+            "postpone5": "推迟 5 分钟 (⌘5)"
+        ],
+        "en": [
+            "screenUsage": "Screen Time",
+            "screenBreak": "Screen Break",
+            "mode": "Mode",
+            "defaultMode": "20-20-20",
+            "customMode": "Custom",
+            "settings": "Settings",
+            "language": "Language",
+            "loginAtStartup": "Launch at Login",
+            "showCountdown": "Show Countdown in Menu Bar",
+            "testBreak": "Break Now",
+            "quit": "Quit",
+            "minutes": "min",
+            "seconds": "sec",
+            "breakOverlayTitle": "Screen Break Time",
+            "breakOverlayText": "20-20-20 Eye Protection: Look at something 20 feet (6 meters) away",
+            "breakOverlayRule": "Screen Time : 20 minutes\nScreen Break : 20 seconds\nLook Distance : 20 feet",
+            "postpone1": "Postpone 1 minute (⌘1)",
+            "postpone2": "Postpone 2 minutes (⌘2)",
+            "postpone5": "Postpone 5 minutes (⌘5)"
+        ],
+        "es": [
+            "screenUsage": "Tiempo de Pantalla",
+            "screenBreak": "Descanso de Pantalla",
+            "mode": "Modo",
+            "defaultMode": "20-20-20",
+            "customMode": "Personalizado",
+            "settings": "Configuración",
+            "language": "Idioma",
+            "loginAtStartup": "Iniciar al Arranque",
+            "showCountdown": "Mostrar Cuenta Regresiva",
+            "testBreak": "Descansar Ahora",
+            "quit": "Salir",
+            "minutes": "min",
+            "seconds": "seg",
+            "breakOverlayTitle": "Tiempo de Descanso",
+            "breakOverlayText": "Protección Ocular 20-20-20: Mira algo a 20 pies (6 metros) de distancia",
+            "breakOverlayRule": "Tiempo de Pantalla : 20 minutos\nDescanso : 20 segundos\nDistancia : 20 pies",
+            "postpone1": "Posponer 1 minuto (⌘1)",
+            "postpone2": "Posponer 2 minutos (⌘2)",
+            "postpone5": "Posponer 5 minutos (⌘5)"
+        ],
+        "ja": [
+            "screenUsage": "画面使用時間",
+            "screenBreak": "画面休憩",
+            "mode": "モード",
+            "defaultMode": "20-20-20",
+            "customMode": "カスタム",
+            "settings": "設定",
+            "language": "言語",
+            "loginAtStartup": "ログイン時に起動",
+            "showCountdown": "メニューバーにカウントダウン表示",
+            "testBreak": "今すぐ休憩",
+            "quit": "終了",
+            "minutes": "分",
+            "seconds": "秒",
+            "breakOverlayTitle": "画面休憩時間",
+            "breakOverlayText": "20-20-20 眼の保護：20フィート（6メートル）先のものを見る",
+            "breakOverlayRule": "画面使用 : 20分\n画面休憩 : 20秒\n視距離 : 20フィート",
+            "postpone1": "1分延期 (⌘1)",
+            "postpone2": "2分延期 (⌘2)",
+            "postpone5": "5分延期 (⌘5)"
+        ],
+        "ko": [
+            "screenUsage": "화면 사용 시간",
+            "screenBreak": "화면 휴식",
+            "mode": "모드",
+            "defaultMode": "20-20-20",
+            "customMode": "사용자 정의",
+            "settings": "설정",
+            "language": "언어",
+            "loginAtStartup": "로그인 시 시작",
+            "showCountdown": "메뉴바에 카운트다운 표시",
+            "testBreak": "지금 휴식",
+            "quit": "종료",
+            "minutes": "분",
+            "seconds": "초",
+            "breakOverlayTitle": "화면 휴식 시간",
+            "breakOverlayText": "20-20-20 눈 보호: 20피트(6미터) 떨어진 곳을 바라보세요",
+            "breakOverlayRule": "화면 사용 : 20분\n화면 휴식 : 20초\n시선 거리 : 20피트",
+            "postpone1": "1분 연기 (⌘1)",
+            "postpone2": "2분 연기 (⌘2)",
+            "postpone5": "5분 연기 (⌘5)"
+        ]
+    ]
+    
+    // Localization helper
+    private func localized(_ key: String) -> String {
+        return localizations[currentLanguage]?[key] ?? localizations["zh-Hans"]?[key] ?? key
+    }
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        loadSettings()
+        setupStatusBar()
+        setupMenu()
+        startWorkTimer()
+    }
+    
+    private func loadSettings() {
+        showCountdownInStatusBar = UserDefaults.standard.bool(forKey: "showCountdownInStatusBar")
+        isCustomMode = UserDefaults.standard.bool(forKey: "isCustomMode")
+        
+        // Load language setting
+        if let savedLanguage = UserDefaults.standard.string(forKey: "currentLanguage") {
+            currentLanguage = savedLanguage
+        } else {
+            // Auto-detect system language
+            let systemLanguage = Locale.preferredLanguages.first ?? "en"
+            if systemLanguage.hasPrefix("zh-Hans") {
+                currentLanguage = "zh-Hans"
+            } else if systemLanguage.hasPrefix("en") {
+                currentLanguage = "en"
+            } else if systemLanguage.hasPrefix("es") {
+                currentLanguage = "es"
+            } else if systemLanguage.hasPrefix("ja") {
+                currentLanguage = "ja"
+            } else if systemLanguage.hasPrefix("ko") {
+                currentLanguage = "ko"
+            } else {
+                currentLanguage = "en" // Default fallback
+            }
+        }
+        
+        let savedCustomWorkDuration = UserDefaults.standard.integer(forKey: "customWorkDuration")
+        if savedCustomWorkDuration > 0 {
+            customWorkDuration = savedCustomWorkDuration
+        }
+        
+        let savedCustomBreakDuration = UserDefaults.standard.integer(forKey: "customBreakDuration")
+        if savedCustomBreakDuration > 0 {
+            customBreakDuration = savedCustomBreakDuration
+        }
+        
+        // Apply the loaded settings
+        if isCustomMode {
+            currentWorkDuration = customWorkDuration
+            currentBreakDuration = customBreakDuration
+        } else {
+            currentWorkDuration = 20 * 60
+            currentBreakDuration = 20
+        }
+    }
+    
+    private func saveSettings() {
+        UserDefaults.standard.set(showCountdownInStatusBar, forKey: "showCountdownInStatusBar")
+        UserDefaults.standard.set(isCustomMode, forKey: "isCustomMode")
+        UserDefaults.standard.set(customWorkDuration, forKey: "customWorkDuration")
+        UserDefaults.standard.set(customBreakDuration, forKey: "customBreakDuration")
+        UserDefaults.standard.set(currentLanguage, forKey: "currentLanguage")
+    }
+    
+    private func setupStatusBar() {
+        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
+        if let button = statusBarItem.button {
+            button.action = #selector(statusBarButtonClicked)
+            button.target = self
+        }
+        
+        updateStatusBarTitle()
+    }
+    
+    private func setupMenu() {
+        menu = NSMenu()
+        menu.delegate = self
+        
+        timerMenuItem = NSMenuItem(title: formatWorkTime(workTimeRemaining), action: nil, keyEquivalent: "")
+        timerMenuItem.isEnabled = false
+        menu.addItem(timerMenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let testBreakItem = NSMenuItem(title: localized("testBreak"), action: #selector(triggerTestBreak), keyEquivalent: "t")
+        testBreakItem.target = self
+        menu.addItem(testBreakItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        setupModeMenu()
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let settingsLabel = NSMenuItem(title: localized("settings"), action: nil, keyEquivalent: "")
+        settingsLabel.isEnabled = false
+        menu.addItem(settingsLabel)
+        
+        // Language selection menu
+        let languageItem = NSMenuItem(title: localized("language"), action: nil, keyEquivalent: "")
+        let languageSubmenu = NSMenu()
+        
+        let languages = [
+            ("en", "English"),
+            ("zh-Hans", "简体中文"),
+            ("es", "Español"),
+            ("ja", "日本語"),
+            ("ko", "한국어")
+        ]
+        
+        for (langCode, langName) in languages {
+            let item = NSMenuItem(title: langName, action: #selector(selectLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = langCode
+            item.state = (currentLanguage == langCode) ? .on : .off
+            languageSubmenu.addItem(item)
+            languageMenuItems.append(item)
+        }
+        
+        languageItem.submenu = languageSubmenu
+        menu.addItem(languageItem)
+        
+        loginItemMenuItem = NSMenuItem(title: localized("loginAtStartup"), action: #selector(toggleLoginItem), keyEquivalent: "")
+        loginItemMenuItem.target = self
+        updateLoginItemState()
+        menu.addItem(loginItemMenuItem)
+        
+        showCountdownMenuItem = NSMenuItem(title: localized("showCountdown"), action: #selector(toggleShowCountdown), keyEquivalent: "")
+        showCountdownMenuItem.target = self
+        updateShowCountdownState()
+        menu.addItem(showCountdownMenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: localized("quit"), action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
+        statusBarItem.menu = menu
+    }
+    
+    private func setupModeMenu() {
+        let modeLabel = NSMenuItem(title: localized("mode"), action: nil, keyEquivalent: "")
+        modeLabel.isEnabled = false
+        menu.addItem(modeLabel)
+        
+        // Default 20-20-20 Mode
+        let defaultModeItem = NSMenuItem(title: localized("defaultMode"), action: #selector(selectDefaultMode), keyEquivalent: "")
+        defaultModeItem.target = self
+        defaultModeItem.state = !isCustomMode ? .on : .off
+        defaultModeItem.representedObject = "defaultMode" // Add identifier
+        menu.addItem(defaultModeItem)
+        modeMenuItems.append(defaultModeItem)
+        
+        // Custom Mode
+        let customModeItem = NSMenuItem(title: localized("customMode"), action: #selector(selectCustomMode), keyEquivalent: "")
+        customModeItem.target = self
+        customModeItem.state = isCustomMode ? .on : .off
+        customModeItem.representedObject = "customMode" // Add identifier
+        menu.addItem(customModeItem)
+        modeMenuItems.append(customModeItem)
+        
+        // Add dynamic sub-items if custom mode is selected
+        if isCustomMode {
+            addCustomModeSubItems()
+        }
+    }
+    
+    private func addCustomModeSubItems() {
+        // Find the index of custom mode item
+        guard let customModeIndex = menu.items.firstIndex(where: { $0.title == localized("customMode") }) else { return }
+        
+        // Work Duration Item with current value display
+        let currentWorkMinutes = currentWorkDuration / 60
+        let workDurationItem = NSMenuItem(title: "    \(localized("screenUsage")): \(currentWorkMinutes) \(localized("minutes"))", action: nil, keyEquivalent: "")
+        let workDurationSubmenu = NSMenu()
+        
+        let workDurations = [10, 20, 30, 40, 50, 60] // minutes
+        for duration in workDurations {
+            let item = NSMenuItem(title: "\(duration) \(localized("minutes"))", action: #selector(selectWorkDuration(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = duration
+            item.state = (currentWorkDuration == duration * 60) ? .on : .off
+            workDurationSubmenu.addItem(item)
+            workDurationMenuItems.append(item)
+        }
+        
+        workDurationItem.submenu = workDurationSubmenu
+        menu.insertItem(workDurationItem, at: customModeIndex + 1)
+        
+        // Break Duration Item with current value display
+        let breakDurationItem = NSMenuItem(title: "    \(localized("screenBreak")): \(currentBreakDuration) \(localized("seconds"))", action: nil, keyEquivalent: "")
+        let breakDurationSubmenu = NSMenu()
+        
+        let breakDurations = [10, 20, 30, 60, 120, 300, 600] // seconds
+        for duration in breakDurations {
+            let item = NSMenuItem(title: "\(duration) \(localized("seconds"))", action: #selector(selectBreakDuration(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = duration
+            item.state = (currentBreakDuration == duration) ? .on : .off
+            breakDurationSubmenu.addItem(item)
+            breakDurationMenuItems.append(item)
+        }
+        
+        breakDurationItem.submenu = breakDurationSubmenu
+        menu.insertItem(breakDurationItem, at: customModeIndex + 2)
+    }
+    
+    private func removeCustomModeSubItems() {
+        // Clear sub-menu items arrays
+        workDurationMenuItems.removeAll()
+        breakDurationMenuItems.removeAll()
+        
+        // Remove the main duration items from menu
+        let itemsToRemove = menu.items.filter { 
+            $0.title.hasPrefix("    \(localized("screenUsage"))") || $0.title.hasPrefix("    \(localized("screenBreak"))")
+        }
+        for item in itemsToRemove {
+            menu.removeItem(item)
+        }
+    }
+    
+    private func updateCustomModeSubItems() {
+        if isCustomMode {
+            removeCustomModeSubItems()
+            addCustomModeSubItems()
+        }
+    }
+    
+    @objc private func statusBarButtonClicked() {
+        statusBarItem.menu = menu
+        statusBarItem.button?.performClick(nil)
+    }
+    
+    @objc private func triggerTestBreak() {
+        workTimer?.invalidate()
+        showBreakOverlay()
+    }
+    
+    @objc private func toggleLoginItem() {
+        let currentState = UserDefaults.standard.bool(forKey: "loginItemEnabled")
+        let newState = !currentState
+        UserDefaults.standard.set(newState, forKey: "loginItemEnabled")
+        updateLoginItemState()
+        
+        if newState {
+            addToLoginItems()
+        } else {
+            removeFromLoginItems()
+        }
+    }
+    
+    private func isLoginItemEnabled() -> Bool {
+        return UserDefaults.standard.bool(forKey: "loginItemEnabled")
+    }
+    
+    private func updateLoginItemState() {
+        let isEnabled = isLoginItemEnabled()
+        loginItemMenuItem.state = isEnabled ? .on : .off
+    }
+    
+    @objc private func toggleShowCountdown() {
+        showCountdownInStatusBar.toggle()
+        updateShowCountdownState()
+        updateStatusBarTitle()
+        saveSettings()
+    }
+    
+    private func updateShowCountdownState() {
+        showCountdownMenuItem.state = showCountdownInStatusBar ? .on : .off
+    }
+    
+    private func addToLoginItems() {
+        let appPath = Bundle.main.bundlePath ?? ""
+        guard !appPath.isEmpty else { return }
+        
+        if #available(macOS 13.0, *) {
+            try? SMAppService.mainApp.register()
+        } else {
+            let script = """
+            tell application "System Events"
+                make login item at end with properties {path:"\(appPath)", hidden:false}
+            end tell
+            """
+            
+            if let appleScript = NSAppleScript(source: script) {
+                appleScript.executeAndReturnError(nil)
+            }
+        }
+    }
+    
+    private func removeFromLoginItems() {
+        let appPath = Bundle.main.bundlePath ?? ""
+        guard !appPath.isEmpty else { return }
+        
+        if #available(macOS 13.0, *) {
+            try? SMAppService.mainApp.unregister()
+        } else {
+            let script = """
+            tell application "System Events"
+                delete login item "\(URL(fileURLWithPath: appPath).lastPathComponent)"
+            end tell
+            """
+            
+            if let appleScript = NSAppleScript(source: script) {
+                appleScript.executeAndReturnError(nil)
+            }
+        }
+    }
+    
+    @objc private func quitApp() {
+        workTimer?.invalidate()
+        breakTimer?.invalidate()
+        menuUpdateTimer?.invalidate()
+        NSApplication.shared.terminate(nil)
+    }
+    
+    @objc private func selectDefaultMode() {
+        if isCustomMode {
+            removeCustomModeSubItems()
+        }
+        isCustomMode = false
+        currentWorkDuration = 20 * 60
+        currentBreakDuration = 20
+        saveSettings()
+        updateModeMenuStates()
+        restartWorkTimer()
+    }
+    
+    @objc private func selectCustomMode() {
+        if !isCustomMode {
+            isCustomMode = true
+            currentWorkDuration = customWorkDuration
+            currentBreakDuration = customBreakDuration
+            addCustomModeSubItems()
+            saveSettings()
+            updateModeMenuStates()
+            restartWorkTimer()
+        }
+    }
+    
+    @objc private func selectWorkDuration(_ sender: NSMenuItem) {
+        currentWorkDuration = sender.tag * 60
+        customWorkDuration = currentWorkDuration
+        updateCustomModeSubItems()
+        updateModeMenuStates()
+        saveSettings()
+        restartWorkTimer()
+    }
+    
+    @objc private func selectBreakDuration(_ sender: NSMenuItem) {
+        currentBreakDuration = sender.tag
+        customBreakDuration = currentBreakDuration
+        updateCustomModeSubItems()
+        updateModeMenuStates()
+        saveSettings()
+    }
+    
+    private func updateModeMenuStates() {
+        // Update mode states based on representedObject instead of array index
+        for item in modeMenuItems {
+            if let identifier = item.representedObject as? String {
+                switch identifier {
+                case "defaultMode":
+                    item.state = !isCustomMode ? .on : .off
+                case "customMode":
+                    item.state = isCustomMode ? .on : .off
+                default:
+                    break
+                }
+            }
+        }
+        
+        // Update work duration states (only when custom mode is active)
+        for item in workDurationMenuItems {
+            item.state = (currentWorkDuration == item.tag * 60) ? .on : .off
+        }
+        
+        // Update break duration states (only when custom mode is active)
+        for item in breakDurationMenuItems {
+            item.state = (currentBreakDuration == item.tag) ? .on : .off
+        }
+    }
+    
+    private func restartWorkTimer() {
+        workTimer?.invalidate()
+        workTimeRemaining = currentWorkDuration
+        updateStatusBarTitle()
+        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateWorkTimer()
+        }
+    }
+    
+    private func startWorkTimer() {
+        workTimer?.invalidate()
+        workTimeRemaining = currentWorkDuration
+        updateStatusBarTitle()
+        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateWorkTimer()
+        }
+    }
+    
+    private func updateWorkTimer() {
+        workTimeRemaining -= 1
+        timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        updateStatusBarTitle()
+        
+        if workTimeRemaining <= 0 {
+            workTimer?.invalidate()
+            showBreakOverlay()
+        }
+    }
+    
+    private func updateStatusBarTitle() {
+        if let button = statusBarItem.button {
+            // Try to load custom status bar icon from SPM bundle resources
+            if let statusIcon = loadStatusBarIcon() {
+                statusIcon.isTemplate = true // This makes it adapt to dark/light mode
+                button.image = statusIcon
+            } else {
+                // Fallback to system symbol if custom icon not found
+                button.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "20-20-20 Eye Protection")
+            }
+            
+            if showCountdownInStatusBar {
+                button.title = " " + formatStatusBarTime(workTimeRemaining)
+            } else {
+                button.title = ""
+            }
+        }
+    }
+    
+    private func loadStatusBarIcon() -> NSImage? {
+        // Try different ways to load the custom icon for SPM
+        
+        // Method 1: Try to load from module bundle with high-res support
+        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyTwentyTwenty_TwentyTwentyTwenty", withExtension: "bundle"),
+           let resourceBundle = Bundle(url: bundle) {
+            
+            // Create an NSImage and add both 1x and 2x representations
+            let statusIcon = NSImage(size: NSSize(width: 16, height: 16))
+            
+            // Load 1x image
+            if let path1x = resourceBundle.path(forResource: "statusbar_icon", ofType: "png", inDirectory: "Resources"),
+               let image1x = NSImage(contentsOfFile: path1x) {
+                let rep1x = image1x.representations.first
+                rep1x?.size = NSSize(width: 16, height: 16)
+                if let rep1x = rep1x {
+                    statusIcon.addRepresentation(rep1x)
+                }
+            }
+            
+            // Load 2x image
+            if let path2x = resourceBundle.path(forResource: "statusbar_icon@2x", ofType: "png", inDirectory: "Resources"),
+               let image2x = NSImage(contentsOfFile: path2x) {
+                let rep2x = image2x.representations.first
+                rep2x?.size = NSSize(width: 16, height: 16) // Logical size stays 16x16
+                if let rep2x = rep2x {
+                    statusIcon.addRepresentation(rep2x)
+                }
+            }
+            
+            return statusIcon.representations.count > 0 ? statusIcon : nil
+        }
+        
+        // Method 2: Try main bundle Resources directory
+        if let resourcePath = Bundle.main.path(forResource: "statusbar_icon", ofType: "png", inDirectory: "Resources"),
+           let statusIcon = NSImage(contentsOfFile: resourcePath) {
+            statusIcon.size = NSSize(width: 16, height: 16)
+            return statusIcon
+        }
+        
+        // Method 3: Try main bundle root
+        if let resourcePath = Bundle.main.path(forResource: "statusbar_icon", ofType: "png"),
+           let statusIcon = NSImage(contentsOfFile: resourcePath) {
+            statusIcon.size = NSSize(width: 16, height: 16)
+            return statusIcon
+        }
+        
+        return nil
+    }
+    
+    
+    private func formatStatusBarTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%02d:%02d", minutes, secs)
+    }
+    
+    private func formatWorkTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%@: %02d:%02d", localized("screenUsage"), minutes, secs)
+    }
+    
+    private func showBreakOverlay() {
+        breakOverlay = BreakOverlayWindow()
+        breakOverlay?.breakDelegate = self
+        breakOverlay?.setLocalizer(localized)
+        
+        // Set initial countdown value before showing the overlay
+        breakTimeRemaining = currentBreakDuration
+        breakOverlay?.updateCountdown(breakTimeRemaining)
+        
+        breakOverlay?.showOverlay()
+        startBreakTimer()
+    }
+    
+    private func startBreakTimer() {
+        breakTimer?.invalidate()
+        // breakTimeRemaining is already set in showBreakOverlay()
+        breakTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateBreakTimer()
+        }
+    }
+    
+    private func updateBreakTimer() {
+        breakTimeRemaining -= 1
+        breakOverlay?.updateCountdown(breakTimeRemaining)
+        
+        if breakTimeRemaining <= 0 {
+            breakTimer?.invalidate()
+            breakOverlay?.hideOverlay()
+            breakOverlay = nil
+            startWorkTimer()
+        }
+    }
+    
+    private func postponeBreak(minutes: Int) {
+        breakTimer?.invalidate()
+        breakOverlay?.hideOverlay()
+        breakOverlay = nil
+        
+        workTimeRemaining = minutes * 60
+        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateWorkTimer()
+        }
+    }
+}
+
+extension AppDelegate: BreakOverlayDelegate {
+    func didRequestPostpone(minutes: Int) {
+        postponeBreak(minutes: minutes)
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        updateLoginItemState()
+        updateShowCountdownState()
+        updateModeMenuStates()
+        startMenuUpdateTimer()
+    }
+    
+    func menuDidClose(_ menu: NSMenu) {
+        stopMenuUpdateTimer()
+    }
+    
+    private func startMenuUpdateTimer() {
+        stopMenuUpdateTimer()
+        menuUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateMenuTimer()
+        }
+    }
+    
+    private func stopMenuUpdateTimer() {
+        menuUpdateTimer?.invalidate()
+        menuUpdateTimer = nil
+    }
+    
+    private func updateMenuTimer() {
+        timerMenuItem.title = formatWorkTime(workTimeRemaining)
+    }
+    
+    @objc private func selectLanguage(_ sender: NSMenuItem) {
+        guard let langCode = sender.representedObject as? String else { return }
+        
+        currentLanguage = langCode
+        saveSettings()
+        
+        // Update language menu items
+        for item in languageMenuItems {
+            item.state = (item.representedObject as? String == currentLanguage) ? .on : .off
+        }
+        
+        // Refresh the entire menu with new language
+        menu.removeAllItems()
+        setupMenu()
+        
+        // Update break overlay if it exists
+        breakOverlay?.setLocalizer(localized)
+    }
+}

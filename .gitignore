@@ -1,0 +1,28 @@
+# Build artifacts
+.build/
+.DS_Store
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.swiftpm
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+
+# Swift Package Manager
+/.swiftpm
+/Packages
+Package.resolved
+
+# Temporary files
+*.tmp
+*.swp
+*~
