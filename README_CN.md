@@ -95,6 +95,15 @@ make build
 make run
 ```
 
+### 创建发布包
+```bash
+# 构建独立应用包
+make build-app
+
+# 创建DMG发布文件
+make dmg
+```
+
 ### 发布构建（Xcode）
 用于App Store分发：
 ```bash

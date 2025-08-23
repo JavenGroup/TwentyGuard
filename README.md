@@ -95,6 +95,15 @@ make build
 make run
 ```
 
+### Creating Distribution Package
+```bash
+# Build standalone app bundle
+make build-app
+
+# Create DMG for distribution
+make dmg
+```
+
 ### Release Build (Xcode)
 For App Store distribution:
 ```bash

@@ -1,6 +1,8 @@
 # Build artifacts
 .build/
 .DS_Store
+build/
+dist/
 
 # Xcode
 *.xcodeproj
@@ -21,6 +23,9 @@ DerivedData/
 /.swiftpm
 /Packages
 Package.resolved
+
+# DMG files
+*.dmg
 
 # Temporary files
 *.tmp
