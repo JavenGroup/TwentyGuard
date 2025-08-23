@@ -50,7 +50,7 @@
 *应用安静地驻留在菜单栏中，提供自定义图标和完整的设置选项。*
 
 ### 休息提醒
-<img src="screenshots/break_reminder.png" alt="20-20-20 休息提醒" width="500">
+<img src="screenshots/break_reminder.png?v=2" alt="20-20-20 休息提醒" width="500">
 
 *到了休息时间，会显示全屏提醒界面，包含延迟选项和键盘快捷键。*
 
