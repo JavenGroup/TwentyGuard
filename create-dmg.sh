@@ -57,8 +57,22 @@ if [ ! -d "${VOLUME}/${APP_NAME}.app" ]; then
     cp -r "$APP_PATH" "${VOLUME}/"
 fi
 
-# Create Applications symlink
+# Create Applications symlink (remove if exists)
+rm -f "${VOLUME}/Applications"
 ln -s /Applications "${VOLUME}/Applications"
+
+# Create a simple README for installation instructions
+cat > "${VOLUME}/Install Instructions.txt" << EOF
+📦 20-20-20 Eye Protection App Installation
+
+1. Drag "20-20-20.app" to the "Applications" folder
+2. Launch the app from Applications folder
+3. On first run, you may need to:
+   - Right-click the app and select "Open"
+   - Or go to System Preferences > Security & Privacy > "Open Anyway"
+
+Thanks for using 20-20-20! 👀
+EOF
 
 # Create background images directory (hidden)
 mkdir -p "${VOLUME}/.background"
@@ -85,9 +99,11 @@ tell application "Finder"
         set text size of viewOptions to ${DMG_TEXT_SIZE}
         
         -- Position the app icon
-        set position of item "${APP_NAME}.app" of container window to {150, 200}
-        -- Position the Applications link
-        set position of item "Applications" of container window to {450, 200}
+        set position of item "${APP_NAME}.app" of container window to {120, 180}
+        -- Position the Applications link  
+        set position of item "Applications" of container window to {420, 180}
+        -- Position the install instructions
+        set position of item "Install Instructions.txt" of container window to {270, 300}
         
         -- Set background if available
         try
