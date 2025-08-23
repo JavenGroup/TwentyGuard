@@ -10,7 +10,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.0-orange.svg)](https://swift.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[Download](#installation) • [Features](#features) • [Usage](#usage) • [Build](#building-from-source) • [中文](README_CN.md)
+[Download](#-installation) • [Features](#-features) • [Usage](#-usage) • [Build](#️-building-from-source) • [中文](README_CN.md)
 
 </div>
 
