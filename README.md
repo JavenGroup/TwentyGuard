@@ -53,9 +53,24 @@ When it's time to rest, a full-screen reminder appears with postpone options and
 ## 🚀 Installation
 
 ### Option 1: Download Release (Recommended)
-1. Download the latest `20-20-20.app` from [Releases](https://github.com/javenfang/20-20-20-Mac-App/releases)
-2. Move the app to your Applications folder
-3. Run the app and enjoy healthier screen time!
+1. Download the latest `20-20-20-Eye-Protection-App-v1.0.0.dmg` from [Releases](https://github.com/javenfang/20-20-20-Mac-App/releases)
+2. Double-click the DMG file to open it
+3. Drag `20-20-20.app` to the `Applications` folder
+4. Eject the DMG and delete the DMG file
+
+**⚠️ First Launch (Unsigned App):**
+- Double-click the app in Applications folder
+- macOS will show "cannot be opened because the developer cannot be verified"
+- Click "Cancel"
+- Go to **System Preferences** → **Security & Privacy** → **General**
+- You'll see a message about "20-20-20" being blocked, click **"Open Anyway"**
+- Click **"Open"** in the confirmation dialog
+- The app will now launch normally
+
+**Alternative method:**
+- Right-click the app in Applications folder
+- Select **"Open"** from the context menu
+- Click **"Open"** in the confirmation dialog
 
 ### Option 2: Build from Source
 See [Building from Source](#building-from-source) section below.
