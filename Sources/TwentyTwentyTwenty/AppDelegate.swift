@@ -7,11 +7,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var workTimer: Timer?
     private var breakTimer: Timer?
     private var menuUpdateTimer: Timer?
-    private var workTimeRemaining: Int = 20 * 60
-    private var breakTimeRemaining: Int = 20
+    private var stateSnapshotTimer: Timer?
+    
+    // 绝对时间记录
+    private var workSessionStartTime: Date?
+    private var breakSessionStartTime: Date?
+    
+    // 推迟状态跟踪
+    private var postponeStartTime: Date?
+    private var postponeDuration: TimeInterval = 0
+    private var postpone5Count: Int = 0  // 推迟5分钟按钮的使用次数
+    private let maxPostpone5Count: Int = 2  // 推迟5分钟的最大次数
+    
     private var timerMenuItem: NSMenuItem!
-    private var breakOverlay: BreakOverlayWindow?
+    private var breakOverlays: [BreakOverlayWindow] = []
     private var loginItemMenuItem: NSMenuItem!
+    private var healthStatsWindow: SimpleStatsWindow?
+    
+    // 日志管理器
+    private let logManager = LogManager.shared
     
     // Mode settings
     private var currentWorkDuration: Int = 20 * 60 // Default 20 minutes
@@ -28,6 +42,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Language settings
     private var currentLanguage: String = ""
     private var languageMenuItems: [NSMenuItem] = []
+    
+    // Protection flags
+    private var isCompletingWorkSession = false
+    private var isCompletingBreakSession = false
+    
+    // MARK: - Computed Properties for Time Calculation
+    
+    private var workTimeRemaining: TimeInterval {
+        guard let startTime = workSessionStartTime else {
+            return TimeInterval(currentWorkDuration)
+        }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return max(0, TimeInterval(currentWorkDuration) - elapsed)
+    }
+    
+    private var breakTimeRemaining: TimeInterval {
+        guard let startTime = breakSessionStartTime else {
+            return TimeInterval(currentBreakDuration)
+        }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return max(0, TimeInterval(currentBreakDuration) - elapsed)
+    }
+    
+    private var isWorkSessionActive: Bool {
+        return workSessionStartTime != nil && workTimeRemaining > 0
+    }
+    
+    private var isBreakSessionActive: Bool {
+        return breakSessionStartTime != nil && breakTimeRemaining > 0
+    }
+    
+    private var postponeTimeRemaining: TimeInterval {
+        guard let startTime = postponeStartTime else { return 0 }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return max(0, postponeDuration - elapsed)
+    }
+    
+    private var isPostponeActive: Bool {
+        return postponeStartTime != nil && postponeTimeRemaining > 0
+    }
+    
+    // MARK: - Localization
     
     // Language localization dictionary
     private var localizations: [String: [String: String]] = [
@@ -50,7 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "breakOverlayRule": "屏幕使用 : 20 分钟\n屏幕禁用 : 20 秒\n看看远方 : 20 米",
             "postpone1": "推迟 1 分钟 (⌘1)",
             "postpone2": "推迟 2 分钟 (⌘2)",
-            "postpone5": "推迟 5 分钟 (⌘5)"
+            "postpone5": "推迟 5 分钟 (⌘5)",
+            "postponed": "推迟",
+            "appAlreadyRunning": "应用已在运行",
+            "appAlreadyRunningMessage": "20-20-20 已经在运行中，只能同时运行一个实例。",
+            "ok": "确定",
+            "eyeHealthStats": "👁️ 眼睛健康统计",
+            "close": "关闭",
+            "eye_health_report": "👁️ 眼睛健康报告"
         ],
         "en": [
             "screenUsage": "Screen Time",
@@ -71,7 +134,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "breakOverlayRule": "Screen Time : 20 minutes\nScreen Break : 20 seconds\nLook Distance : 20 feet",
             "postpone1": "Postpone 1 minute (⌘1)",
             "postpone2": "Postpone 2 minutes (⌘2)",
-            "postpone5": "Postpone 5 minutes (⌘5)"
+            "postpone5": "Postpone 5 minutes (⌘5)",
+            "postponed": "Postponed",
+            "appAlreadyRunning": "App Already Running",
+            "appAlreadyRunningMessage": "20-20-20 is already running. Only one instance can run at a time.",
+            "ok": "OK",
+            "eyeHealthStats": "👁️ Eye Health Stats",
+            "close": "Close",
+            "eye_health_report": "👁️ Eye Health Report"
         ],
         "es": [
             "screenUsage": "Tiempo de Pantalla",
@@ -92,7 +162,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "breakOverlayRule": "Tiempo de Pantalla : 20 minutos\nDescanso : 20 segundos\nDistancia : 20 pies",
             "postpone1": "Posponer 1 minuto (⌘1)",
             "postpone2": "Posponer 2 minutos (⌘2)",
-            "postpone5": "Posponer 5 minutos (⌘5)"
+            "postpone5": "Posponer 5 minutos (⌘5)",
+            "postponed": "Pospuesto",
+            "appAlreadyRunning": "Aplicación Ya Ejecutándose",
+            "appAlreadyRunningMessage": "20-20-20 ya está ejecutándose. Solo puede ejecutarse una instancia a la vez.",
+            "ok": "OK",
+            "eyeHealthStats": "👁️ Estadísticas de Salud Ocular",
+            "close": "Cerrar",
+            "eye_health_report": "👁️ Informe de Salud Ocular"
         ],
         "ja": [
             "screenUsage": "画面使用時間",
@@ -113,7 +190,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "breakOverlayRule": "画面使用 : 20分\n画面休憩 : 20秒\n視距離 : 20フィート",
             "postpone1": "1分延期 (⌘1)",
             "postpone2": "2分延期 (⌘2)",
-            "postpone5": "5分延期 (⌘5)"
+            "postpone5": "5分延期 (⌘5)",
+            "postponed": "延期",
+            "eyeHealthStats": "👁️ 目の健康統計",
+            "close": "閉じる",
+            "eye_health_report": "👁️ 目の健康レポート"
         ],
         "ko": [
             "screenUsage": "화면 사용 시간",
@@ -134,7 +215,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "breakOverlayRule": "화면 사용 : 20분\n화면 휴식 : 20초\n시선 거리 : 20피트",
             "postpone1": "1분 연기 (⌘1)",
             "postpone2": "2분 연기 (⌘2)",
-            "postpone5": "5분 연기 (⌘5)"
+            "postpone5": "5분 연기 (⌘5)",
+            "postponed": "연기",
+            "eyeHealthStats": "👁️ 눈 건강 통계",
+            "close": "닫기",
+            "eye_health_report": "👁️ 눈 건강 보고서"
         ]
     ]
     
@@ -144,10 +229,155 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 检查是否已有实例运行
+        if !checkSingleInstance() {
+            NSApp.terminate(nil)
+            return
+        }
+        
         loadSettings()
         setupStatusBar()
         setupMenu()
-        startWorkTimer()
+        setupSystemNotifications()
+        
+        // 尝试恢复会话状态，如果无法恢复则启动新的工作会话
+        print("🔥 准备恢复会话状态...")
+        if !restoreSessionIfNeeded() {
+            // 没有有效的会话状态，启动新的工作计时器
+            print("🔥 恢复失败，启动新的工作计时器")
+            startWorkTimer()
+        } else {
+            // 成功恢复会话状态，仅启动UI更新计时器
+            print("🔥 恢复成功，启动UI更新计时器")
+            startUIUpdateTimer()
+        }
+        
+        // 启动状态快照计时器（每10秒记录一次状态）
+        startStateSnapshotTimer()
+    }
+    
+    private func checkSingleInstance() -> Bool {
+        let runningApps = NSWorkspace.shared.runningApplications
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let currentExecutablePath = Bundle.main.executablePath
+        
+        print("检查单实例：当前进程 \(currentPID)，可执行路径：\(currentExecutablePath ?? "unknown")")
+        
+        // 查找相同可执行路径的其他进程
+        let sameApps = runningApps.filter { app in
+            guard app.processIdentifier != currentPID else { return false }
+            
+            // 比较可执行路径
+            if let executableURL = app.executableURL,
+               let currentPath = currentExecutablePath {
+                return executableURL.path == currentPath
+            }
+            
+            // 备选方案：比较 bundle identifier (适用于发布版本)
+            if let bundleID = app.bundleIdentifier,
+               let currentBundleID = Bundle.main.bundleIdentifier {
+                return bundleID == currentBundleID
+            }
+            
+            return false
+        }
+        
+        print("找到相同进程：\(sameApps.count)个")
+        
+        if !sameApps.isEmpty {
+            // 有其他实例运行，记录日志并直接退出（不显示弹窗以避免阻塞）
+            print("发现已有实例运行，当前实例将退出")
+            logManager.logEvent(.appTerminated, context: ["reason": "duplicate_instance"])
+            
+            // 激活现有实例
+            if let existingApp = sameApps.first {
+                existingApp.activate(options: [])
+            }
+            
+            return false
+        }
+        
+        return true
+    }
+    
+    private func restoreSessionIfNeeded() -> Bool {
+        logManager.logEvent(.appLaunched, context: ["debug": "restore_start"])
+        
+        if let savedState = logManager.restoreSessionState() {
+            logManager.logEvent(.appLaunched, context: ["debug": "decode_success", "workStartTime": savedState.workStartTime?.description ?? "nil"])
+            
+            // 重要：不恢复用户配置（isCustomMode, currentWorkDuration, currentBreakDuration）
+            // 这些应该始终来自UserDefaults，通过loadSettings()获取
+            // 只恢复时间相关的会话状态（开始时间等）
+            
+            let timeSinceLastSave = Date().timeIntervalSince(savedState.lastSaved)
+            logManager.logEvent(.appLaunched, context: ["debug": "time_check", "seconds_since_save": "\(Int(timeSinceLastSave))", "paused_by_system": "\(savedState.pausedBySystemEvent)"])
+            
+            // 使用新的恢复逻辑
+            if !savedState.shouldRestoreAfterSystemEvent() {
+                let reason = savedState.pausedBySystemEvent ? "paused_by_system_event" : "session_too_old"
+                logManager.logEvent(.appLaunched, context: ["debug": "session_rejected", "reason": reason])
+                logManager.logTimerReset(reason: reason)
+                return false
+            } else {
+                logManager.logEvent(.appLaunched, context: ["debug": "session_valid"])
+            }
+            
+            // 恢复工作会话
+            if let workStart = savedState.workStartTime {
+                let workElapsed = Date().timeIntervalSince(workStart)
+                let maxWorkTime = TimeInterval(currentWorkDuration) + 2 * 60 // 允许2分钟缓冲
+                
+                if workElapsed < maxWorkTime {
+                    // 继续工作会话
+                    workSessionStartTime = workStart
+                    print("🔄 恢复工作会话，已用时 \(Int(workElapsed))秒，剩余 \(Int(workTimeRemaining))秒")
+                    
+                    if workElapsed >= TimeInterval(currentWorkDuration) {
+                        // 工作时间已到，立即进入休息
+                        logManager.logWorkCompleted(duration: workElapsed)
+                        showBreakOverlay()
+                    }
+                    return true
+                } else {
+                    // 工作时间过长，重置
+                    logManager.logWorkPaused(duration: workElapsed, reason: "session_overtime")
+                    logManager.logTimerReset(reason: "work_session_overtime")
+                    return false
+                }
+            }
+            
+            // 恢复休息会话
+            if let breakStart = savedState.breakStartTime {
+                let breakElapsed = Date().timeIntervalSince(breakStart)
+                let maxBreakTime = TimeInterval(currentBreakDuration) + 1 * 60 // 允许1分钟缓冲
+                
+                if breakElapsed < maxBreakTime {
+                    // 继续休息会话
+                    breakSessionStartTime = breakStart
+                    print("🔄 恢复休息会话，已用时 \(Int(breakElapsed))秒，剩余 \(Int(breakTimeRemaining))秒")
+                    showBreakOverlay()
+                    return true
+                } else {
+                    // 休息时间过长，自动完成休息
+                    logManager.logBreakCompleted(actualDuration: breakElapsed, expectedDuration: currentBreakDuration)
+                    logManager.logTimerReset(reason: "break_session_overtime")
+                    return false
+                }
+            }
+        }
+        
+        // 没有有效的保存状态，需要开始新会话
+        logManager.logEvent(.appLaunched, context: ["debug": "restore_failed", "reason": "no_session_state"])
+        return false
+    }
+    
+    private func startUIUpdateTimer() {
+        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateWorkTimer()
+        }
+        updateStatusBarTitle()
+        updateMenuTimer()
     }
     
     private func loadSettings() {
@@ -201,6 +431,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(customWorkDuration, forKey: "customWorkDuration")
         UserDefaults.standard.set(customBreakDuration, forKey: "customBreakDuration")
         UserDefaults.standard.set(currentLanguage, forKey: "currentLanguage")
+        
+        // 记录设置变更
+        let changes: [String: String] = [
+            "show_countdown": "\(showCountdownInStatusBar)",
+            "custom_mode": "\(isCustomMode)",
+            "custom_work_duration": "\(customWorkDuration)",
+            "custom_break_duration": "\(customBreakDuration)",
+            "language": currentLanguage
+        ]
+        logManager.logSettingsChanged(changes: changes)
     }
     
     private func setupStatusBar() {
@@ -226,7 +466,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let testBreakItem = NSMenuItem(title: localized("testBreak"), action: #selector(triggerTestBreak), keyEquivalent: "t")
         testBreakItem.target = self
+        testBreakItem.keyEquivalentModifierMask = .command
         menu.addItem(testBreakItem)
+        
+        let healthStatsItem = NSMenuItem(title: localized("eyeHealthStats"), action: #selector(showHealthStats), keyEquivalent: "s")
+        healthStatsItem.target = self
+        healthStatsItem.keyEquivalentModifierMask = .command
+        menu.addItem(healthStatsItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -276,9 +522,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let quitItem = NSMenuItem(title: localized("quit"), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
+        quitItem.keyEquivalentModifierMask = .command
         menu.addItem(quitItem)
         
         statusBarItem.menu = menu
+    }
+    
+    private func setupSystemNotifications() {
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        
+        // Listen for system sleep/wake notifications
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(systemWillSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+        
+        // Listen for screen sleep/wake notifications
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(screensDidSleep),
+            name: NSWorkspace.screensDidSleepNotification,
+            object: nil
+        )
+        
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(screensDidWake),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
+        
+        // Listen for screen lock/unlock notifications (closer to screensaver functionality)
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenDidLock),
+            name: NSNotification.Name("com.apple.screenIsLocked"),
+            object: nil
+        )
+        
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenDidUnlock),
+            name: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil
+        )
+        
+        // Listen for screensaver notifications
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screensaverDidStart),
+            name: NSNotification.Name("com.apple.screensaver.didstart"),
+            object: nil
+        )
+        
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screensaverDidStop),
+            name: NSNotification.Name("com.apple.screensaver.didstop"),
+            object: nil
+        )
     }
     
     private func setupModeMenu() {
@@ -331,12 +642,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.insertItem(workDurationItem, at: customModeIndex + 1)
         
         // Break Duration Item with current value display
-        let breakDurationItem = NSMenuItem(title: "    \(localized("screenBreak")): \(currentBreakDuration) \(localized("seconds"))", action: nil, keyEquivalent: "")
+        let breakDisplayText: String
+        if currentBreakDuration >= 60 {
+            let minutes = currentBreakDuration / 60
+            breakDisplayText = "\(minutes) \(localized("minutes"))"
+        } else {
+            breakDisplayText = "\(currentBreakDuration) \(localized("seconds"))"
+        }
+        let breakDurationItem = NSMenuItem(title: "    \(localized("screenBreak")): \(breakDisplayText)", action: nil, keyEquivalent: "")
         let breakDurationSubmenu = NSMenu()
         
-        let breakDurations = [10, 20, 30, 60, 120, 300, 600] // seconds
+        let breakDurations = [10, 20, 30, 60, 120, 180, 300, 600] // seconds: 10s, 20s, 30s, 1min, 2min, 3min, 5min, 10min
         for duration in breakDurations {
-            let item = NSMenuItem(title: "\(duration) \(localized("seconds"))", action: #selector(selectBreakDuration(_:)), keyEquivalent: "")
+            let displayText: String
+            if duration >= 60 {
+                let minutes = duration / 60
+                displayText = "\(minutes) \(localized("minutes"))"
+            } else {
+                displayText = "\(duration) \(localized("seconds"))"
+            }
+            let item = NSMenuItem(title: displayText, action: #selector(selectBreakDuration(_:)), keyEquivalent: "")
             item.target = self
             item.tag = duration
             item.state = (currentBreakDuration == duration) ? .on : .off
@@ -375,8 +700,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func triggerTestBreak() {
+        // 记录当前工作会话（如果有）
+        if let startTime = workSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logWorkPaused(duration: elapsed, reason: "manual_test_break")
+        }
+        
         workTimer?.invalidate()
         showBreakOverlay()
+    }
+    
+    @objc private func showHealthStats() {
+        // 如果窗口已经存在，就激活它而不是创建新的
+        if let existingWindow = healthStatsWindow {
+            if existingWindow.isVisible {
+                existingWindow.makeKeyAndOrderFront(nil)
+                return
+            } else {
+                // 窗口存在但不可见，清理引用
+                healthStatsWindow = nil
+            }
+        }
+        
+        // 创建新的统计窗口
+        let statsWindow = SimpleStatsWindow()
+        statsWindow.setLocalizer(localized)
+        healthStatsWindow = statsWindow
+        
+        // 设置窗口代理以在关闭时清理引用
+        statsWindow.delegate = self
+        
+        // 使用系统的居中方法
+        statsWindow.center()
+        print("📐 统计窗口已居中")
+        
+        // 显示窗口
+        statsWindow.makeKeyAndOrderFront(nil)
+        
+        // 强制设置到主屏幕
+        if let mainScreen = NSScreen.main {
+            let screenFrame = mainScreen.visibleFrame
+            let x = screenFrame.minX + (screenFrame.width - 380) / 2
+            let y = screenFrame.minY + (screenFrame.height - 420) / 2
+            statsWindow.setFrame(NSRect(x: x, y: y, width: 380, height: 420), display: true)
+        }
+        
+        // 确保窗口获得焦点
+        NSApp.activate(ignoringOtherApps: true)
+        
+        print("📊 统计窗口已创建并显示")
     }
     
     @objc private func toggleLoginItem() {
@@ -451,9 +823,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func quitApp() {
+        // 记录当前会话状态
+        if let startTime = workSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logWorkPaused(duration: elapsed, reason: "app_terminated")
+        }
+        
+        if let startTime = breakSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+        }
+        
+        // 记录应用退出，但不清理会话状态（以便重启后能恢复）
+        logManager.logEvent(.appTerminated)
+        
         workTimer?.invalidate()
         breakTimer?.invalidate()
         menuUpdateTimer?.invalidate()
+        stateSnapshotTimer?.invalidate()
+        
+        // Clean up notification observers
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default.removeObserver(self)
+        
         NSApplication.shared.terminate(nil)
     }
     
@@ -464,6 +856,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCustomMode = false
         currentWorkDuration = 20 * 60
         currentBreakDuration = 20
+        
+        logManager.logEvent(.modeChanged, context: [
+            "new_mode": "default",
+            "work_duration": "\(currentWorkDuration)",
+            "break_duration": "\(currentBreakDuration)"
+        ])
+        
         saveSettings()
         updateModeMenuStates()
         restartWorkTimer()
@@ -474,6 +873,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isCustomMode = true
             currentWorkDuration = customWorkDuration
             currentBreakDuration = customBreakDuration
+            
+            logManager.logEvent(.modeChanged, context: [
+                "new_mode": "custom",
+                "work_duration": "\(currentWorkDuration)",
+                "break_duration": "\(currentBreakDuration)"
+            ])
+            
             addCustomModeSubItems()
             saveSettings()
             updateModeMenuStates()
@@ -525,32 +931,94 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func restartWorkTimer() {
-        workTimer?.invalidate()
-        workTimeRemaining = currentWorkDuration
+        // 停止当前工作会话（如果有）
+        if let startTime = workSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logWorkPaused(duration: elapsed, reason: "manual_restart")
+        }
+        
+        // 开始新的工作会话
+        workSessionStartTime = Date()
+        breakSessionStartTime = nil
+        postponeStartTime = nil
+        postponeDuration = 0
+        postpone5Count = 0  // 重置推迟5分钟次数
+        
         updateStatusBarTitle()
+        updateMenuTimer()
+        saveCurrentSessionState()
+        
+        let mode = isCustomMode ? "custom" : "default"
+        logManager.logWorkStarted(mode: mode)
+        
+        // 启动UI更新计时器
+        workTimer?.invalidate()
         workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.updateWorkTimer()
         }
     }
     
     private func startWorkTimer() {
-        workTimer?.invalidate()
-        workTimeRemaining = currentWorkDuration
+        // 如果在推迟期间，不要重置工作会话
+        if !isPostponeActive {
+            // 如果还没有开始工作会话，则开始一个新的
+            if workSessionStartTime == nil {
+                workSessionStartTime = Date()
+                let mode = isCustomMode ? "custom" : "default"
+                logManager.logTimerReset(reason: "fresh_start")
+                logManager.logWorkStarted(mode: mode)
+            }
+        }
+        
+        breakSessionStartTime = nil
         updateStatusBarTitle()
+        updateMenuTimer()
+        saveCurrentSessionState()
+        
+        // 启动UI更新计时器
+        workTimer?.invalidate()
         workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.updateWorkTimer()
         }
     }
     
     private func updateWorkTimer() {
-        workTimeRemaining -= 1
-        timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        updateMenuTimer()
         updateStatusBarTitle()
         
-        if workTimeRemaining <= 0 {
+        // 检查推迟时间是否结束
+        if isPostponeActive && postponeTimeRemaining <= 0 {
+            // 推迟时间结束，清除推迟状态，开始正常休息
             workTimer?.invalidate()
+            workTimer = nil
+            postponeStartTime = nil
+            postponeDuration = 0
             showBreakOverlay()
         }
+        // 检查工作时间是否已完成（添加重入保护）
+        else if workTimeRemaining <= 0 && !isCompletingWorkSession {
+            completeWorkSession()
+        }
+    }
+    
+    private func completeWorkSession() {
+        // 设置标志防止重入
+        isCompletingWorkSession = true
+        
+        // 首先停止定时器，无论后续操作是否成功
+        workTimer?.invalidate()
+        workTimer = nil
+        
+        if let startTime = workSessionStartTime {
+            let actualDuration = Date().timeIntervalSince(startTime)
+            logManager.logWorkCompleted(duration: actualDuration)
+        }
+        
+        // 尝试显示休息窗口
+        showBreakOverlay()
+        
+        // 清除标志
+        isCompletingWorkSession = false
     }
     
     private func updateStatusBarTitle() {
@@ -565,7 +1033,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             if showCountdownInStatusBar {
-                button.title = " " + formatStatusBarTime(workTimeRemaining)
+                // 如果处于推迟状态，显示推迟倒计时
+                if isPostponeActive {
+                    button.title = " " + formatStatusBarTime(Int(postponeTimeRemaining))
+                } else {
+                    button.title = " " + formatStatusBarTime(Int(workTimeRemaining))
+                }
             } else {
                 button.title = ""
             }
@@ -629,53 +1102,362 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return String(format: "%02d:%02d", minutes, secs)
     }
     
-    private func formatWorkTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
+    private func formatWorkTime(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(seconds)
+        let minutes = totalSeconds / 60
+        let secs = totalSeconds % 60
         return String(format: "%@: %02d:%02d", localized("screenUsage"), minutes, secs)
     }
     
+    // MARK: - Helper Methods
+    
+    private func updateMenuTimer() {
+        if isPostponeActive {
+            // 推迟期间显示推迟倒计时
+            let totalSeconds = Int(postponeTimeRemaining)
+            let minutes = totalSeconds / 60
+            let secs = totalSeconds % 60
+            timerMenuItem.title = String(format: "%@: %02d:%02d (%@)", localized("screenUsage"), minutes, secs, localized("postponed"))
+        } else {
+            timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        }
+    }
+    
+    private func saveCurrentSessionState() {
+        logManager.saveSessionState(
+            workStartTime: workSessionStartTime,
+            breakStartTime: breakSessionStartTime,
+            currentWorkDuration: currentWorkDuration,
+            currentBreakDuration: currentBreakDuration,
+            isCustomMode: isCustomMode
+        )
+    }
+    
+    private func startStateSnapshotTimer() {
+        stateSnapshotTimer?.invalidate()
+        stateSnapshotTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            self?.recordStateSnapshot()
+        }
+    }
+    
+    private func stopStateSnapshotTimer() {
+        stateSnapshotTimer?.invalidate()
+        stateSnapshotTimer = nil
+    }
+    
+    private func recordStateSnapshot() {
+        let currentMode = isCustomMode ? "custom" : "default"
+        
+        logManager.logStateSnapshot(
+            workStartTime: workSessionStartTime,
+            breakStartTime: breakSessionStartTime,
+            workRemaining: workTimeRemaining,
+            breakRemaining: breakTimeRemaining,
+            currentMode: currentMode
+        )
+        
+        // 同时保存会话状态
+        saveCurrentSessionState()
+    }
+    
     private func showBreakOverlay() {
-        breakOverlay = BreakOverlayWindow()
-        breakOverlay?.breakDelegate = self
-        breakOverlay?.setLocalizer(localized)
+        print("🎭 showBreakOverlay 被调用")
         
-        // Set initial countdown value before showing the overlay
-        breakTimeRemaining = currentBreakDuration
-        breakOverlay?.updateCountdown(breakTimeRemaining)
+        // 检查屏幕是否可用
+        guard !NSScreen.screens.isEmpty else {
+            print("❌ 没有可用屏幕")
+            logManager.logEvent(.breakSkipped, context: ["reason": "no_screens_available"])
+            // 屏幕不可用，延迟1秒后重新开始工作会话
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.startWorkTimer()
+            }
+            return
+        }
         
-        breakOverlay?.showOverlay()
+        print("📺 检测到 \(NSScreen.screens.count) 个屏幕")
+        
+        // 结束工作会话，开始休息会话
+        workSessionStartTime = nil
+        breakSessionStartTime = Date()
+        saveCurrentSessionState()
+        
+        logManager.logBreakStarted(expectedDuration: currentBreakDuration)
+        
+        // 为每个屏幕创建一个覆盖窗口
+        print("🔄 清空旧的 breakOverlays（当前有 \(breakOverlays.count) 个）")
+        breakOverlays.removeAll()
+        
+        for (index, screen) in NSScreen.screens.enumerated() {
+            let screenInfo = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "unknown"
+            print("  📺 为屏幕 \(index + 1)/\(NSScreen.screens.count) 创建窗口 - 屏幕ID: \(screenInfo)")
+            
+            let overlay = BreakOverlayWindow(screen: screen)
+            overlay.breakDelegate = self
+            overlay.setLocalizer(localized)
+            overlay.updateCountdown(Int(breakTimeRemaining))
+            overlay.setRemainingPostpone5Count(maxPostpone5Count - postpone5Count)  // 设置剩余推迟5分钟次数
+            overlay.showOverlay()
+            breakOverlays.append(overlay)
+            
+            print("     - 窗口创建成功: \(overlay)")
+        }
+        
+        print("✅ 创建了 \(breakOverlays.count) 个休息窗口")
+        
+        // 如果没有成功创建任何覆盖窗口，回退到工作状态
+        if breakOverlays.isEmpty {
+            print("❌ 没有成功创建任何窗口")
+            logManager.logEvent(.breakSkipped, context: ["reason": "overlay_creation_failed"])
+            startWorkTimer()
+            return
+        }
+        
         startBreakTimer()
     }
     
     private func startBreakTimer() {
         breakTimer?.invalidate()
-        // breakTimeRemaining is already set in showBreakOverlay()
         breakTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.updateBreakTimer()
         }
     }
     
     private func updateBreakTimer() {
-        breakTimeRemaining -= 1
-        breakOverlay?.updateCountdown(breakTimeRemaining)
+        let remaining = Int(breakTimeRemaining)
+        for overlay in breakOverlays {
+            overlay.updateCountdown(remaining)
+        }
         
-        if breakTimeRemaining <= 0 {
-            breakTimer?.invalidate()
-            breakOverlay?.hideOverlay()
-            breakOverlay = nil
-            startWorkTimer()
+        if breakTimeRemaining <= 0 && !isCompletingBreakSession {
+            completeBreakSession()
         }
     }
     
-    private func postponeBreak(minutes: Int) {
-        breakTimer?.invalidate()
-        breakOverlay?.hideOverlay()
-        breakOverlay = nil
+    private func completeBreakSession() {
+        // 设置标志防止重入
+        isCompletingBreakSession = true
         
-        workTimeRemaining = minutes * 60
+        // 首先停止定时器，无论后续操作是否成功
+        breakTimer?.invalidate()
+        breakTimer = nil
+        
+        cleanupBreakOverlays()
+        
+        if let startTime = breakSessionStartTime {
+            let actualDuration = Date().timeIntervalSince(startTime)
+            logManager.logBreakCompleted(actualDuration: actualDuration, expectedDuration: currentBreakDuration)
+        }
+        
+        breakSessionStartTime = nil
+        postpone5Count = 0  // 完成休息后重置推迟5分钟次数
+        startWorkTimer()
+        
+        // 清除标志
+        isCompletingBreakSession = false
+    }
+    
+    private func cleanupBreakOverlays() {
+        // 彻底清理所有休息窗口
+        print("🧹 开始清理休息窗口 - 共 \(breakOverlays.count) 个")
+        
+        for (index, overlay) in breakOverlays.enumerated() {
+            let screenInfo = overlay.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "unknown"
+            print("  📺 清理窗口 \(index + 1)/\(breakOverlays.count) - 屏幕: \(screenInfo)")
+            print("     - 窗口状态: isVisible=\(overlay.isVisible), level=\(overlay.level.rawValue)")
+            print("     - 窗口对象: \(overlay)")
+            
+            overlay.hideOverlay()
+            
+            print("     - 清理后: isVisible=\(overlay.isVisible)")
+        }
+        
+        let countBefore = breakOverlays.count
+        breakOverlays.removeAll()
+        print("✅ 窗口清理完成 - 清理前: \(countBefore) 个, 清理后: \(breakOverlays.count) 个")
+    }
+    
+    private func postponeBreak(minutes: Int) {
+        print("🚀 postponeBreak 被调用 - 推迟 \(minutes) 分钟")
+        print("  - 当前 breakOverlays 数量: \(breakOverlays.count)")
+        print("  - 当前屏幕数量: \(NSScreen.screens.count)")
+        
+        // 仅对推迟5分钟按钮进行次数限制
+        if minutes == 5 {
+            if postpone5Count >= maxPostpone5Count {
+                print("⚠️ 推迟5分钟次数已达上限 (\(maxPostpone5Count)次)")
+                return
+            }
+            postpone5Count += 1
+            print("📊 第 \(postpone5Count) 次推迟5分钟，剩余 \(maxPostpone5Count - postpone5Count) 次")
+        }
+        
+        // 记录推迟的休息
+        if let startTime = breakSessionStartTime {
+            let partialDuration = Date().timeIntervalSince(startTime)
+            logManager.logBreakPostponed(partialDuration: partialDuration, postponeMinutes: minutes)
+        }
+        
+        print("⏸️ 停止休息计时器")
+        breakTimer?.invalidate()
+        
+        print("🧹 调用 cleanupBreakOverlays")
+        cleanupBreakOverlays()
+        
+        breakSessionStartTime = nil
+        
+        // 开始推迟计时器 - 不修改原始工作时长设置
+        postponeStartTime = Date()
+        postponeDuration = TimeInterval(minutes * 60)
+        
+        // 保持原始工作时长不变，不保存临时状态到会话文件
+        logManager.logWorkStarted(mode: "postponed_\(minutes)min")
+        
+        // 先清理现有的计时器，避免冲突
+        workTimer?.invalidate()
         workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateWorkTimer()
+            guard let self = self else { return }
+            
+            // 更新UI显示推迟倒计时
+            self.updateStatusBarTitle()
+            self.updateMenuTimer()
+            
+            // 检查推迟时间是否结束
+            if self.postponeTimeRemaining <= 0 {
+                // 推迟时间结束，清除推迟状态，开始正常休息
+                self.workTimer?.invalidate()
+                self.postponeStartTime = nil
+                self.postponeDuration = 0
+                self.showBreakOverlay()
+            }
+        }
+    }
+    
+    // MARK: - System Event Handlers
+    
+    @objc private func systemWillSleep() {
+        print("🛌 System will sleep - pausing session")
+        pauseCurrentSession(reason: "system_sleep")
+        logManager.logEvent(.systemSleep)
+    }
+    
+    @objc private func systemDidWake() {
+        print("🌅 System did wake - evaluating session")
+        logManager.logEvent(.systemWake)
+        evaluateAndResumeSession(reason: "system_wake")
+    }
+    
+    @objc private func screenDidLock() {
+        print("🔒 Screen did lock - pausing session")
+        pauseCurrentSession(reason: "screen_lock")
+        logManager.logEvent(.screenLock)
+    }
+    
+    @objc private func screenDidUnlock() {
+        print("🔓 Screen did unlock - evaluating session")
+        logManager.logEvent(.screenUnlock)
+        evaluateAndResumeSession(reason: "screen_unlock")
+    }
+    
+    @objc private func screensDidSleep() {
+        print("📺 Screens did sleep - pausing session")
+        pauseCurrentSession(reason: "display_sleep")
+        logManager.logEvent(.displaySleep)
+    }
+    
+    @objc private func screensDidWake() {
+        print("📺 Screens did wake - evaluating session")
+        logManager.logEvent(.displayWake)
+        evaluateAndResumeSession(reason: "display_wake")
+    }
+    
+    @objc private func screensaverDidStart() {
+        print("🖥️ Screensaver did start - pausing session")
+        pauseCurrentSession(reason: "screensaver_start")
+        logManager.logEvent(.screensaverStart)
+    }
+    
+    @objc private func screensaverDidStop() {
+        print("🖥️ Screensaver did stop - evaluating session")
+        logManager.logEvent(.screensaverStop)
+        evaluateAndResumeSession(reason: "screensaver_stop")
+    }
+    
+    private func pauseCurrentSession(reason: String) {
+        workTimer?.invalidate()
+        breakTimer?.invalidate()
+        
+        // 保存当前状态，标记为被系统事件暂停
+        logManager.saveSessionState(
+            workStartTime: workSessionStartTime,
+            breakStartTime: breakSessionStartTime,
+            currentWorkDuration: currentWorkDuration,
+            currentBreakDuration: currentBreakDuration,
+            isCustomMode: isCustomMode,
+            pausedBySystemEvent: true  // 标记为系统事件暂停
+        )
+    }
+    
+    private func evaluateAndResumeSession(reason: String) {
+        // 屏幕保护程序/睡眠本身就是休息，用户回来后应该开始新的工作会话
+        
+        if reason.contains("screensaver") || reason.contains("sleep") {
+            print("🔄 屏幕保护/睡眠回来 - 重置为新的工作会话（用户已得到休息）")
+            
+            // 记录之前的会话状态
+            if let workStart = workSessionStartTime {
+                let elapsed = Date().timeIntervalSince(workStart)
+                logManager.logWorkPaused(duration: elapsed, reason: "screensaver_break_\(reason)")
+            } else if let breakStart = breakSessionStartTime {
+                let elapsed = Date().timeIntervalSince(breakStart)
+                logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+            }
+            
+            // 清理休息窗口（如果存在）
+            cleanupBreakOverlays()
+            
+            // 重置为新的工作会话
+            workSessionStartTime = nil
+            breakSessionStartTime = nil
+            restartWorkTimer()
+            return
+        }
+        
+        // 其他系统事件（屏幕锁定/解锁等）的处理
+        if let workStart = workSessionStartTime {
+            let elapsed = Date().timeIntervalSince(workStart)
+            
+            if elapsed > TimeInterval(currentWorkDuration + 5 * 60) {
+                // 如果已经过了工作时间+5分钟缓冲，重置为新的工作会话
+                logManager.logWorkPaused(duration: elapsed, reason: "auto_reset_\(reason)")
+                restartWorkTimer()
+            } else if elapsed > TimeInterval(currentWorkDuration) {
+                // 工作时间已到，应该休息
+                logManager.logWorkCompleted(duration: elapsed)
+                showBreakOverlay()
+            } else {
+                // 继续之前的工作会话
+                startWorkTimer() // 这会继续使用现有的 workSessionStartTime
+            }
+        } else if let breakStart = breakSessionStartTime {
+            let elapsed = Date().timeIntervalSince(breakStart)
+            
+            // 如果离开时间超过1分钟，认为用户已经休息过了，直接开始新的工作周期
+            if elapsed > 60 {
+                // 用户离开时间足够长，视为已完成休息
+                logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+                
+                // 清理可能存在的休息窗口
+                cleanupBreakOverlays()
+                
+                breakSessionStartTime = nil
+                startWorkTimer()
+            } else {
+                // 离开时间很短，继续显示休息窗口
+                showBreakOverlay()
+            }
+        } else {
+            // 没有活跃的会话，开始新的工作会话
+            startWorkTimer()
         }
     }
 }
@@ -686,9 +1468,27 @@ extension AppDelegate: BreakOverlayDelegate {
     }
 }
 
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        // 如果关闭的是统计窗口，清理引用
+        if let window = notification.object as? SimpleStatsWindow, window == healthStatsWindow {
+            healthStatsWindow = nil
+            print("📊 统计窗口引用已清理")
+        }
+    }
+}
+
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
-        timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        // 检查是否处于推迟状态
+        if isPostponeActive {
+            let totalSeconds = Int(postponeTimeRemaining)
+            let minutes = totalSeconds / 60
+            let secs = totalSeconds % 60
+            timerMenuItem.title = String(format: "%@: %02d:%02d (%@)", localized("screenUsage"), minutes, secs, localized("postponed"))
+        } else {
+            timerMenuItem.title = formatWorkTime(workTimeRemaining)
+        }
         updateLoginItemState()
         updateShowCountdownState()
         updateModeMenuStates()
@@ -711,10 +1511,6 @@ extension AppDelegate: NSMenuDelegate {
         menuUpdateTimer = nil
     }
     
-    private func updateMenuTimer() {
-        timerMenuItem.title = formatWorkTime(workTimeRemaining)
-    }
-    
     @objc private func selectLanguage(_ sender: NSMenuItem) {
         guard let langCode = sender.representedObject as? String else { return }
         
@@ -730,7 +1526,9 @@ extension AppDelegate: NSMenuDelegate {
         menu.removeAllItems()
         setupMenu()
         
-        // Update break overlay if it exists
-        breakOverlay?.setLocalizer(localized)
+        // Update break overlays if they exist
+        for overlay in breakOverlays {
+            overlay.setLocalizer(localized)
+        }
     }
 }

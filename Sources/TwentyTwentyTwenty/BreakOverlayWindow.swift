@@ -21,12 +21,20 @@ class BreakOverlayWindow: NSWindow {
     // Global keyboard monitor
     private var keyboardMonitor: Any?
     
+    // Postpone count tracking (only for 5-minute postpone)
+    private var remainingPostpone5Count: Int = 2
+    
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
-        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
-        super.init(contentRect: screenFrame, styleMask: [.borderless], backing: .buffered, defer: false)
+        super.init(contentRect: contentRect, styleMask: [.borderless], backing: .buffered, defer: false)
         
         setupWindow()
         setupUI()
+    }
+    
+    convenience init(screen: NSScreen) {
+        self.init(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        // 设置窗口到指定屏幕
+        self.setFrameOrigin(screen.frame.origin)
     }
     
     convenience init() {
@@ -74,14 +82,9 @@ class BreakOverlayWindow: NSWindow {
         titleLabel.backgroundColor = NSColor.clear
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
-        // Countdown container with circular background
+        // Countdown container (simple, no circular border)
         let countdownContainer = NSView()
         countdownContainer.translatesAutoresizingMaskIntoConstraints = false
-        countdownContainer.wantsLayer = true
-        countdownContainer.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.1).cgColor
-        countdownContainer.layer?.cornerRadius = 80
-        countdownContainer.layer?.borderWidth = 3
-        countdownContainer.layer?.borderColor = NSColor.systemBlue.cgColor
         
         countdownLabel = NSTextField(labelWithString: "")
         countdownLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 80, weight: .bold)
@@ -258,6 +261,9 @@ class BreakOverlayWindow: NSWindow {
         button.layer?.cornerRadius = 8
         button.translatesAutoresizingMaskIntoConstraints = false
         
+        // 确保按钮能接收事件
+        button.isEnabled = true
+        
         // Enable content size calculation for auto-sizing
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -266,6 +272,13 @@ class BreakOverlayWindow: NSWindow {
     }
     
     func showOverlay() {
+        print("🎭 显示休息覆盖窗口")
+        
+        // 确保按钮启用
+        postpone1Button.isEnabled = true
+        postpone2Button.isEnabled = true
+        postpone5Button.isEnabled = true
+        
         // Make window key and front
         makeKeyAndOrderFront(nil)
         
@@ -274,6 +287,8 @@ class BreakOverlayWindow: NSWindow {
         makeKey()
         makeFirstResponder(self)
         
+        print("🎭 窗口焦点状态: isKeyWindow=\(isKeyWindow), canBecomeKey=\(canBecomeKey)")
+        
         // Set up global keyboard monitoring for shortcuts
         setupKeyboardMonitoring()
         
@@ -281,6 +296,7 @@ class BreakOverlayWindow: NSWindow {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NSApp.activate(ignoringOtherApps: true)
             self.makeKey()
+            print("🎭 延迟后窗口焦点状态: isKeyWindow=\(self.isKeyWindow)")
             self.makeFirstResponder(self)
         }
     }
@@ -322,6 +338,34 @@ class BreakOverlayWindow: NSWindow {
         countdownLabel.stringValue = "\(seconds)"
     }
     
+    func setRemainingPostpone5Count(_ count: Int) {
+        remainingPostpone5Count = count
+        updatePostponeButtons()
+    }
+    
+    private func updatePostponeButtons() {
+        // 推迟1分钟和2分钟按钮始终启用
+        postpone1Button.isEnabled = true
+        postpone2Button.isEnabled = true
+        
+        // 推迟5分钟按钮根据剩余次数启用/禁用
+        postpone5Button.isEnabled = remainingPostpone5Count > 0
+        
+        // 更新按钮标题
+        if let localizer = localizer {
+            // 推迟1分钟和2分钟按钮正常显示
+            postpone1Button.title = localizer("postpone1")
+            postpone2Button.title = localizer("postpone2")
+            
+            // 推迟5分钟按钮显示剩余次数
+            if remainingPostpone5Count > 0 {
+                postpone5Button.title = "\(localizer("postpone5")) (\(remainingPostpone5Count))"
+            } else {
+                postpone5Button.title = localizer("postpone5")
+            }
+        }
+    }
+    
     private func updateTexts() {
         guard let localizer = localizer else { return }
         
@@ -350,27 +394,40 @@ class BreakOverlayWindow: NSWindow {
             }
         }
         
-        postpone1Button.title = localizer("postpone1")
-        postpone2Button.title = localizer("postpone2")
-        postpone5Button.title = localizer("postpone5")
+        // 更新按钮文本时也要显示剩余次数
+        updatePostponeButtons()
     }
     
     @objc private func postpone1ButtonClicked() {
-        breakDelegate?.didRequestPostpone(minutes: 1)
+        print("🔘 推迟1分钟按钮被点击")
+        performPostpone(minutes: 1)
     }
     
     @objc private func postpone2ButtonClicked() {
-        breakDelegate?.didRequestPostpone(minutes: 2)
+        print("🔘 推迟2分钟按钮被点击") 
+        performPostpone(minutes: 2)
     }
     
     @objc private func postpone5ButtonClicked() {
-        breakDelegate?.didRequestPostpone(minutes: 5)
+        print("🔘 推迟5分钟按钮被点击")
+        performPostpone(minutes: 5)
+    }
+    
+    private func performPostpone(minutes: Int) {
+        // 记录哪个屏幕的窗口被点击
+        let screenInfo = self.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "unknown"
+        print("🔘 推迟 \(minutes) 分钟按钮被点击 - 屏幕: \(screenInfo)")
+        print("  - 窗口状态: isVisible=\(self.isVisible), level=\(self.level.rawValue)")
+        
+        // 直接同步调用 delegate，让它统一清理所有窗口
+        // 不要提前 hideOverlay()，不要异步调用
+        breakDelegate?.didRequestPostpone(minutes: minutes)
     }
     
     // Override keyboard event handling for shortcuts
     override func keyDown(with event: NSEvent) {
         let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let keyCode = event.keyCode
+        let _ = event.keyCode
         
         // Check for Command key modifier
         if modifierFlags == .command {
@@ -392,7 +449,7 @@ class BreakOverlayWindow: NSWindow {
         super.keyDown(with: event)
     }
     
-    // Ensure window can become key window
+    // Ensure window can become key window and accept first responder
     override var canBecomeKey: Bool {
         return true
     }
