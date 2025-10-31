@@ -16,15 +16,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // 推迟状态跟踪
     private var postponeStartTime: Date?
     private var postponeDuration: TimeInterval = 0
-    private var postpone5Count: Int = 0  // 推迟5分钟按钮的使用次数
-    private let maxPostpone5Count: Int = 2  // 推迟5分钟的最大次数
+    private var totalPostponedTime: TimeInterval = 0  // 累计推迟时间（秒）
+    private let maxTotalPostponeTime: TimeInterval = 10 * 60  // 最多推迟10分钟
     
     private var timerMenuItem: NSMenuItem!
     private var breakOverlays: [BreakOverlayWindow] = []
     private var loginItemMenuItem: NSMenuItem!
     private var healthStatsWindow: SimpleStatsWindow?
     
-    // 日志管理器
+    // 事件记录器（新的统一系统）
+    private let eventRecorder = EventRecorder.shared
+    // 保留日志管理器用于会话恢复
     private let logManager = LogManager.shared
     
     // Mode settings
@@ -108,6 +110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone2": "推迟 2 分钟 (⌘2)",
             "postpone5": "推迟 5 分钟 (⌘5)",
             "postponed": "推迟",
+            "postpone_status": "已推迟 %d 分钟，剩余可推迟 %d 分钟",
             "appAlreadyRunning": "应用已在运行",
             "appAlreadyRunningMessage": "20-20-20 已经在运行中，只能同时运行一个实例。",
             "ok": "确定",
@@ -136,6 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone2": "Postpone 2 minutes (⌘2)",
             "postpone5": "Postpone 5 minutes (⌘5)",
             "postponed": "Postponed",
+            "postpone_status": "Postponed %d min, %d min left",
             "appAlreadyRunning": "App Already Running",
             "appAlreadyRunningMessage": "20-20-20 is already running. Only one instance can run at a time.",
             "ok": "OK",
@@ -164,6 +168,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone2": "Posponer 2 minutos (⌘2)",
             "postpone5": "Posponer 5 minutos (⌘5)",
             "postponed": "Pospuesto",
+            "postpone_status": "Pospuesto %d min, quedan %d min",
             "appAlreadyRunning": "Aplicación Ya Ejecutándose",
             "appAlreadyRunningMessage": "20-20-20 ya está ejecutándose. Solo puede ejecutarse una instancia a la vez.",
             "ok": "OK",
@@ -192,6 +197,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone2": "2分延期 (⌘2)",
             "postpone5": "5分延期 (⌘5)",
             "postponed": "延期",
+            "postpone_status": "%d分延期済み、残り%d分",
             "eyeHealthStats": "👁️ 目の健康統計",
             "close": "閉じる",
             "eye_health_report": "👁️ 目の健康レポート"
@@ -217,6 +223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone2": "2분 연기 (⌘2)",
             "postpone5": "5분 연기 (⌘5)",
             "postponed": "연기",
+            "postpone_status": "%d분 연기됨, %d분 남음",
             "eyeHealthStats": "👁️ 눈 건강 통계",
             "close": "닫기",
             "eye_health_report": "👁️ 눈 건강 보고서"
@@ -240,6 +247,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenu()
         setupSystemNotifications()
         
+        // 记录应用启动
+        eventRecorder.recordAppLaunch()
+
         // 尝试恢复会话状态，如果无法恢复则启动新的工作会话
         print("🔥 准备恢复会话状态...")
         if !restoreSessionIfNeeded() {
@@ -302,8 +312,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func restoreSessionIfNeeded() -> Bool {
         logManager.logEvent(.appLaunched, context: ["debug": "restore_start"])
-        
-        if let savedState = logManager.restoreSessionState() {
+
+        if let savedState = eventRecorder.restoreSessionState() {
             logManager.logEvent(.appLaunched, context: ["debug": "decode_success", "workStartTime": savedState.workStartTime?.description ?? "nil"])
             
             // 重要：不恢复用户配置（isCustomMode, currentWorkDuration, currentBreakDuration）
@@ -331,6 +341,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if workElapsed < maxWorkTime {
                     // 继续工作会话
                     workSessionStartTime = workStart
+                    // 在数据库中记录恢复的会话
+                    eventRecorder.startWorkSession(duration: currentWorkDuration)
                     print("🔄 恢复工作会话，已用时 \(Int(workElapsed))秒，剩余 \(Int(workTimeRemaining))秒")
                     
                     if workElapsed >= TimeInterval(currentWorkDuration) {
@@ -440,7 +452,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "custom_break_duration": "\(customBreakDuration)",
             "language": currentLanguage
         ]
-        logManager.logSettingsChanged(changes: changes)
+        eventRecorder.recordSettingsChange(changes: changes)
     }
     
     private func setupStatusBar() {
@@ -705,7 +717,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let elapsed = Date().timeIntervalSince(startTime)
             logManager.logWorkPaused(duration: elapsed, reason: "manual_test_break")
         }
-        
+
+        // 使用新的事件记录器
+        eventRecorder.endWorkSession()
+
         workTimer?.invalidate()
         showBreakOverlay()
     }
@@ -828,14 +843,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let elapsed = Date().timeIntervalSince(startTime)
             logManager.logWorkPaused(duration: elapsed, reason: "app_terminated")
         }
-        
+
         if let startTime = breakSessionStartTime {
             let elapsed = Date().timeIntervalSince(startTime)
             logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
         }
-        
-        // 记录应用退出，但不清理会话状态（以便重启后能恢复）
-        logManager.logEvent(.appTerminated)
+
+        // 使用新的事件记录器
+        eventRecorder.recordAppTermination()
         
         workTimer?.invalidate()
         breakTimer?.invalidate()
@@ -857,11 +872,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         currentWorkDuration = 20 * 60
         currentBreakDuration = 20
         
-        logManager.logEvent(.modeChanged, context: [
-            "new_mode": "default",
-            "work_duration": "\(currentWorkDuration)",
-            "break_duration": "\(currentBreakDuration)"
-        ])
+        eventRecorder.recordModeChange(mode: "default", workDuration: currentWorkDuration, breakDuration: currentBreakDuration)
         
         saveSettings()
         updateModeMenuStates()
@@ -874,11 +885,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             currentWorkDuration = customWorkDuration
             currentBreakDuration = customBreakDuration
             
-            logManager.logEvent(.modeChanged, context: [
-                "new_mode": "custom",
-                "work_duration": "\(currentWorkDuration)",
-                "break_duration": "\(currentBreakDuration)"
-            ])
+            eventRecorder.recordModeChange(mode: "custom", workDuration: currentWorkDuration, breakDuration: currentBreakDuration)
             
             addCustomModeSubItems()
             saveSettings()
@@ -942,14 +949,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         breakSessionStartTime = nil
         postponeStartTime = nil
         postponeDuration = 0
-        postpone5Count = 0  // 重置推迟5分钟次数
-        
+        totalPostponedTime = 0  // 重置累计推迟时间
+
         updateStatusBarTitle()
         updateMenuTimer()
         saveCurrentSessionState()
-        
-        let mode = isCustomMode ? "custom" : "default"
-        logManager.logWorkStarted(mode: mode)
+
+        // 使用新的事件记录器
+        eventRecorder.startWorkSession(duration: currentWorkDuration)
         
         // 启动UI更新计时器
         workTimer?.invalidate()
@@ -964,9 +971,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 如果还没有开始工作会话，则开始一个新的
             if workSessionStartTime == nil {
                 workSessionStartTime = Date()
-                let mode = isCustomMode ? "custom" : "default"
-                logManager.logTimerReset(reason: "fresh_start")
-                logManager.logWorkStarted(mode: mode)
+                eventRecorder.recordTimerReset(reason: "fresh_start")
+                eventRecorder.startWorkSession(duration: currentWorkDuration)
             }
         }
         
@@ -1162,7 +1168,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func showBreakOverlay() {
         print("🎭 showBreakOverlay 被调用")
-        
+
+        // 防止重复创建窗口 - 如果已有窗口，先清理
+        if !breakOverlays.isEmpty {
+            print("⚠️ 检测到已存在 \(breakOverlays.count) 个休息窗口，先清理")
+            cleanupBreakOverlays()
+        }
+
         // 检查屏幕是否可用
         guard !NSScreen.screens.isEmpty else {
             print("❌ 没有可用屏幕")
@@ -1173,16 +1185,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
-        
+
         print("📺 检测到 \(NSScreen.screens.count) 个屏幕")
-        
+
         // 结束工作会话，开始休息会话
         workSessionStartTime = nil
         breakSessionStartTime = Date()
         saveCurrentSessionState()
-        
-        logManager.logBreakStarted(expectedDuration: currentBreakDuration)
-        
+
+        // 使用新的事件记录器
+        eventRecorder.startBreakSession(duration: currentBreakDuration)
+
         // 为每个屏幕创建一个覆盖窗口
         print("🔄 清空旧的 breakOverlays（当前有 \(breakOverlays.count) 个）")
         breakOverlays.removeAll()
@@ -1195,7 +1208,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlay.breakDelegate = self
             overlay.setLocalizer(localized)
             overlay.updateCountdown(Int(breakTimeRemaining))
-            overlay.setRemainingPostpone5Count(maxPostpone5Count - postpone5Count)  // 设置剩余推迟5分钟次数
+
+            // 更新推迟状态显示
+            let usedMinutes = Int(totalPostponedTime / 60)
+            let remainingMinutes = Int((maxTotalPostponeTime - totalPostponedTime) / 60)
+            overlay.updatePostponeStatus(used: usedMinutes, remaining: remainingMinutes)
+
             overlay.showOverlay()
             breakOverlays.append(overlay)
             
@@ -1224,10 +1242,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func updateBreakTimer() {
         let remaining = Int(breakTimeRemaining)
-        for overlay in breakOverlays {
-            overlay.updateCountdown(remaining)
+
+        // 检测异常情况：如果休息时间已经超过预期很多，可能是系统睡眠导致的
+        if let breakStart = breakSessionStartTime {
+            let elapsed = Date().timeIntervalSince(breakStart)
+            if elapsed > TimeInterval(currentBreakDuration + 60) { // 超过预期时间1分钟以上
+                print("⚠️ 检测到异常的休息时长: \(elapsed)秒, 预期: \(currentBreakDuration)秒")
+                print("   可能是系统睡眠导致的，立即完成休息会话")
+                completeBreakSession()
+                return
+            }
         }
-        
+
+        // 更新所有窗口的倒计时
+        for overlay in breakOverlays {
+            overlay.updateCountdown(max(0, remaining)) // 确保不显示负数
+        }
+
+        // 正常完成休息
         if breakTimeRemaining <= 0 && !isCompletingBreakSession {
             completeBreakSession()
         }
@@ -1249,7 +1281,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         breakSessionStartTime = nil
-        postpone5Count = 0  // 完成休息后重置推迟5分钟次数
+        totalPostponedTime = 0  // 完成休息后重置累计推迟时间
         startWorkTimer()
         
         // 清除标志
@@ -1280,30 +1312,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("🚀 postponeBreak 被调用 - 推迟 \(minutes) 分钟")
         print("  - 当前 breakOverlays 数量: \(breakOverlays.count)")
         print("  - 当前屏幕数量: \(NSScreen.screens.count)")
-        
-        // 仅对推迟5分钟按钮进行次数限制
-        if minutes == 5 {
-            if postpone5Count >= maxPostpone5Count {
-                print("⚠️ 推迟5分钟次数已达上限 (\(maxPostpone5Count)次)")
-                return
-            }
-            postpone5Count += 1
-            print("📊 第 \(postpone5Count) 次推迟5分钟，剩余 \(maxPostpone5Count - postpone5Count) 次")
+
+        let postponeSeconds = TimeInterval(minutes * 60)
+
+        // 检查是否超过累计上限（10分钟）
+        if totalPostponedTime + postponeSeconds > maxTotalPostponeTime {
+            print("⚠️ 已达推迟上限，累计推迟: \(Int(totalPostponedTime / 60)) 分钟，无法继续推迟 \(minutes) 分钟")
+            return
         }
+
+        // 累加推迟时间
+        totalPostponedTime += postponeSeconds
+        print("📊 累计推迟: \(Int(totalPostponedTime / 60)) 分钟，剩余可推迟: \(Int((maxTotalPostponeTime - totalPostponedTime) / 60)) 分钟")
         
         // 记录推迟的休息
-        if let startTime = breakSessionStartTime {
-            let partialDuration = Date().timeIntervalSince(startTime)
-            logManager.logBreakPostponed(partialDuration: partialDuration, postponeMinutes: minutes)
-        }
+        // 使用新的事件记录器
+        eventRecorder.recordPostpone(minutes: minutes)
         
         print("⏸️ 停止休息计时器")
         breakTimer?.invalidate()
         
         print("🧹 调用 cleanupBreakOverlays")
         cleanupBreakOverlays()
-        
+
         breakSessionStartTime = nil
+
+        // 更新所有休息窗口的推迟状态显示（如果有的话）
+        updateBreakOverlaysPostponeStatus()
         
         // 开始推迟计时器 - 不修改原始工作时长设置
         postponeStartTime = Date()
@@ -1398,67 +1433,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func evaluateAndResumeSession(reason: String) {
-        // 屏幕保护程序/睡眠本身就是休息，用户回来后应该开始新的工作会话
-        
-        if reason.contains("screensaver") || reason.contains("sleep") {
-            print("🔄 屏幕保护/睡眠回来 - 重置为新的工作会话（用户已得到休息）")
-            
-            // 记录之前的会话状态
-            if let workStart = workSessionStartTime {
-                let elapsed = Date().timeIntervalSince(workStart)
-                logManager.logWorkPaused(duration: elapsed, reason: "screensaver_break_\(reason)")
-            } else if let breakStart = breakSessionStartTime {
-                let elapsed = Date().timeIntervalSince(breakStart)
-                logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
-            }
-            
-            // 清理休息窗口（如果存在）
+        // 首先检查并清理任何残留的休息窗口
+        if !breakOverlays.isEmpty {
+            print("⚠️ 检测到系统唤醒后有 \(breakOverlays.count) 个残留休息窗口，先清理")
             cleanupBreakOverlays()
-            
-            // 重置为新的工作会话
-            workSessionStartTime = nil
-            breakSessionStartTime = nil
-            restartWorkTimer()
-            return
         }
-        
-        // 其他系统事件（屏幕锁定/解锁等）的处理
+
+        // 用户需求：无论之前什么状态，打开电脑后应该直接进入「工作状态」
+        // 方案：任何系统唤醒事件都重置为新的工作会话
+        print("🔄 系统唤醒 (\(reason)) - 重置为新的工作会话")
+
+        // 记录之前的会话状态
         if let workStart = workSessionStartTime {
             let elapsed = Date().timeIntervalSince(workStart)
-            
-            if elapsed > TimeInterval(currentWorkDuration + 5 * 60) {
-                // 如果已经过了工作时间+5分钟缓冲，重置为新的工作会话
-                logManager.logWorkPaused(duration: elapsed, reason: "auto_reset_\(reason)")
-                restartWorkTimer()
-            } else if elapsed > TimeInterval(currentWorkDuration) {
-                // 工作时间已到，应该休息
-                logManager.logWorkCompleted(duration: elapsed)
-                showBreakOverlay()
-            } else {
-                // 继续之前的工作会话
-                startWorkTimer() // 这会继续使用现有的 workSessionStartTime
-            }
+            logManager.logWorkPaused(duration: elapsed, reason: "system_wake_reset_\(reason)")
         } else if let breakStart = breakSessionStartTime {
             let elapsed = Date().timeIntervalSince(breakStart)
-            
-            // 如果离开时间超过1分钟，认为用户已经休息过了，直接开始新的工作周期
-            if elapsed > 60 {
-                // 用户离开时间足够长，视为已完成休息
-                logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
-                
-                // 清理可能存在的休息窗口
-                cleanupBreakOverlays()
-                
-                breakSessionStartTime = nil
-                startWorkTimer()
-            } else {
-                // 离开时间很短，继续显示休息窗口
-                showBreakOverlay()
-            }
-        } else {
-            // 没有活跃的会话，开始新的工作会话
-            startWorkTimer()
+            logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
         }
+
+        // 清理定时器
+        breakTimer?.invalidate()
+        breakTimer = nil
+
+        // 重置为新的工作会话
+        workSessionStartTime = nil
+        breakSessionStartTime = nil
+        restartWorkTimer()
     }
 }
 
@@ -1474,6 +1475,20 @@ extension AppDelegate: NSWindowDelegate {
         if let window = notification.object as? SimpleStatsWindow, window == healthStatsWindow {
             healthStatsWindow = nil
             print("📊 统计窗口引用已清理")
+        }
+    }
+}
+
+// MARK: - Helper Methods
+
+extension AppDelegate {
+    /// 更新所有休息窗口的推迟状态显示
+    private func updateBreakOverlaysPostponeStatus() {
+        let usedMinutes = Int(totalPostponedTime / 60)
+        let remainingMinutes = Int((maxTotalPostponeTime - totalPostponedTime) / 60)
+
+        for overlay in breakOverlays {
+            overlay.updatePostponeStatus(used: usedMinutes, remaining: remainingMinutes)
         }
     }
 }

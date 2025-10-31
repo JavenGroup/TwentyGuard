@@ -2,59 +2,78 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 📚 文档导航
+
+**本文档**: 开发快速入口，提供**构建流程和关键开发注意事项**。
+
+**完整文档**:
+- **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - 功能需求文档：完整的功能列表和用户场景
+- **[docs/architecture.md](docs/architecture.md)** - 技术架构文档：深入的实现细节和维护指南
+- **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug 修复历史：问题根因分析和修复记录
+
+---
+
 ## Project Overview
 
-**20-20-20 Mac App** - A complete eye protection utility implementing the 20-20-20 rule (every 20 minutes, look at something 20 meters away for at least 20 seconds). This is a native macOS menu bar application with full-screen break notifications.
+**20-20-20 Mac App** - A native macOS menu bar application implementing the 20-20-20 rule (every 20 minutes, look at something 20 meters away for at least 20 seconds) to protect eye health.
 
-## ✅ Implementation Status: **COMPLETE**
+**Implementation Status**: ✅ **COMPLETE** - Fully implemented and ready for production use.
 
-The app is fully implemented and ready for production use. All planned features have been developed and tested.
+**Key Features**: 工作/休息循环、推迟功能、健康统计、多语言支持、系统事件智能响应
+
+📖 **详细功能说明**: 参见 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
+
+## 🎯 核心设计决策
+
+**这些是关键的设计原则，已经明确确定，不应反复讨论：**
+
+### 1. 系统唤醒后的行为 ⭐ (v1.1.0)
+> **无论之前什么状态，任何系统唤醒后都直接进入新的工作周期**
+
+**原因**:
+- 屏保/睡眠/合盖本身就是眼睛休息
+- 用户回来后应该全新开始，避免"刚打开就要休息"的体验
+
+**触发事件**: 系统睡眠、屏幕锁定、屏保、显示器睡眠、合盖
+
+### 2. 推迟机制 ⭐ (v1.1.0)
+> **累计时长限制：所有推迟操作总计最多 10 分钟**
+
+**原因**: 防止用户通过反复推迟绕过休息提醒
+
+**实现**: 动态禁用按钮 + 实时状态显示
+
+### 3. 时间计算
+> **使用绝对时间而非相对计数**
+
+**原因**: 避免累积误差，支持系统睡眠恢复
+
+📖 **完整设计决策**: 参见 [docs/architecture.md](docs/architecture.md#9-关键技术决策)
 
 ## Architecture
 
 **Native macOS Application** built with Swift and AppKit:
-- **Menu Bar Application**: Lives in the status bar with comprehensive menu system
-- **Full-Screen Overlay**: Modal break window that prevents interaction with other apps
-- **Local Storage**: UserDefaults-based settings persistence
-- **Multi-Language Support**: Localized for 5 languages
-- **High-DPI Support**: Retina-ready custom icons
+- Menu Bar Application with comprehensive menu system
+- Full-Screen Break Overlay (multi-monitor support)
+- SQLite + JSON dual-layer data persistence
+- 5 languages support with runtime switching
+- Smart session recovery after sleep/screensaver
 
-## ✅ Implemented Features
-
-### Core Functionality
-- ✅ **Default 20-20-20 mode** (20 min work, 20 sec break)
-- ✅ **Custom mode support** (10-60 min work, 10-600 sec break)  
-- ✅ **Postpone options** (1, 2, 5 minutes with keyboard shortcuts)
-- ✅ **"Break Now" testing** (immediate break trigger)
-
-### User Interface
-- ✅ **Custom status bar icon** (high-resolution 20 logo with template rendering)
-- ✅ **Comprehensive menu system** with mode switching and settings
-- ✅ **Full-screen break overlay** with modern design and proper text alignment
-- ✅ **Keyboard shortcuts** (⌘1, ⌘2, ⌘5 for postpone actions)
-- ✅ **Optional countdown display** in menu bar
-
-### Internationalization
-- ✅ **Multi-language support**: Chinese (Simplified), English, Spanish, Japanese, Korean
-- ✅ **Auto-detection** of system language with manual override
-- ✅ **Dynamic menu updates** when language changes
-
-### System Integration
-- ✅ **Login item support** (start at system login)
-- ✅ **Settings persistence** (all preferences saved automatically)
-- ✅ **Dark/Light mode adaptation** (template-based icon rendering)
+📖 **详细技术架构**: 参见 [docs/architecture.md](docs/architecture.md)
+- 组件关系图、数据流、计时机制详解
+- 事件处理系统、持久化方案
+- 完整的维护指南和问题排查
 
 ## 🏗️ Project Structure
 
-### 单一项目架构 (Swift Package Manager)
-- **Location**: `/Users/javenfang/Coding/20-20-20/`
-- **Purpose**: 所有开发、维护和发布
-- **架构说明**: 本项目采用单一 Swift Package Manager 架构，无需 Xcode 项目文件
-- **Files**:
-  - `Sources/TwentyTwentyTwenty/AppDelegate.swift` - Main application logic
-  - `Sources/TwentyTwentyTwenty/BreakOverlayWindow.swift` - Break window implementation
-  - `Sources/TwentyTwentyTwenty/Resources/` - Status bar icon assets
-  - `Makefile` - 标准化构建流程定义
+**单一项目架构** (Swift Package Manager):
+- 位置: `/Users/javenfang/Coding/20-20-20/`
+- 无需 Xcode 项目文件，全部通过 Makefile 管理
+- 核心文件: AppDelegate.swift、BreakOverlayWindow.swift、EventRecorder.swift、StatsDatabase.swift
+
+📖 **完整文件说明**: 参见 [docs/architecture.md](docs/architecture.md#13-项目结构)
 
 ## 🚀 标准化构建流程
 
@@ -109,27 +128,6 @@ make launch     # 步骤3: 启动新版本
 - **所有构建必须通过 Makefile**，确保一致性
 - **避免版本混乱**：始终使用 `make install` 更新 Applications 版本
 
-## 🎯 Technical Implementation Notes
-
-### Status Bar Icon
-- Custom PNG assets (16x16 and 32x32) with template rendering for dark/light mode
-- Swift Package Manager: Bundle resource loading via `Bundle.main.path(forResource:ofType:inDirectory:)`
-- Xcode Project: Standard Assets.xcassets integration
-
-### Break Overlay Window
-- Full-screen borderless window with `.screenSaver` level
-- Global keyboard monitoring for shortcuts (works even without window focus)
-- Proper text alignment using grid layout for colon-separated content
-- Auto-sizing buttons for multi-language support
-
-### Localization System
-- Runtime language switching without app restart
-- Fallback chain: Selected → System → Chinese → English
-- All UI strings localized including button shortcuts
-
-### Settings Persistence
-- UserDefaults-based with immediate saving
-- Keys: `showCountdownInStatusBar`, `isCustomMode`, `customWorkDuration`, `customBreakDuration`, `currentLanguage`
 
 ## 🔧 Maintenance Notes
 
@@ -154,27 +152,21 @@ make launch     # 步骤3: 启动新版本
 
 3. **验证修复**：
    - 检查会话状态文件：`currentWorkDuration` 应该是 1800（30分钟）
-   - 检查时间格式：应该是 `+0800`（本地时间）而不是 `Z`（UTC）
-   - 测试屏保/睡眠恢复：应该重置为新的30分钟工作周期
+   - 测试系统唤醒行为：合盖/锁屏/屏保后应该重置为新的30分钟工作周期
+   - 测试推迟功能：累计推迟不超过10分钟，按钮动态禁用
 
-### 🐛 常见问题排查
+### 🐛 常见问题快速排查
 
-**症状：倒计时不是从30分钟开始**
-- **原因**：Applications中的旧版本仍在运行
+**症状：倒计时不准确或版本混乱**
 - **解决**：`make install` 重新安装最新版本
 
-**症状：时间格式显示UTC（Z结尾）而不是本地时间（+0800）**
-- **原因**：旧版本的时间处理逻辑
-- **解决**：确保运行最新版本，检查 LogManager.swift 中的 DateFormatter 设置
+**症状：推迟功能异常**
+- **检查**：推迟逻辑不应修改 `currentWorkDuration`
 
-**症状：推迟功能影响正常工作周期**
-- **原因**：推迟逻辑错误地修改了持久化的工作时长
-- **解决**：确保推迟逻辑只使用临时状态变量，不修改 `currentWorkDuration`
-
-### 构建一致性保证
-- **唯一构建方式**: 通过 Makefile 命令
-- **输出位置固定**: build/20-20-20.app
-- **版本管理**: 避免多版本共存导致的混乱
+📖 **完整问题排查**: 参见 [docs/architecture.md](docs/architecture.md#101-常见问题排查)
+- 详细的症状分析和解决方案
+- 日志查看方法和数据库检查命令
+- 性能监控指标
 
 ## 📱 App Store Readiness
 

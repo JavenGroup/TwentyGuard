@@ -14,15 +14,13 @@ class BreakOverlayWindow: NSWindow {
     private var postpone1Button: NSButton!
     private var postpone2Button: NSButton!
     private var postpone5Button: NSButton!
-    
+    private var postponeStatusLabel: NSTextField!  // 底部状态提示标签
+
     // Localization closure
     private var localizer: ((String) -> String)?
-    
+
     // Global keyboard monitor
     private var keyboardMonitor: Any?
-    
-    // Postpone count tracking (only for 5-minute postpone)
-    private var remainingPostpone5Count: Int = 2
     
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: [.borderless], backing: .buffered, defer: false)
@@ -192,6 +190,16 @@ class BreakOverlayWindow: NSWindow {
         postpone5Button.keyEquivalent = "5"
         postpone5Button.keyEquivalentModifierMask = .command
         
+        // 创建底部状态标签
+        postponeStatusLabel = NSTextField(labelWithString: "")
+        postponeStatusLabel.font = NSFont.systemFont(ofSize: 14)
+        postponeStatusLabel.textColor = NSColor.secondaryLabelColor
+        postponeStatusLabel.alignment = .center
+        postponeStatusLabel.isEditable = false
+        postponeStatusLabel.isBordered = false
+        postponeStatusLabel.backgroundColor = NSColor.clear
+        postponeStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+
         // Add views to containers
         countdownContainer.addSubview(countdownLabel)
         mainContainer.addSubview(titleLabel)
@@ -200,6 +208,7 @@ class BreakOverlayWindow: NSWindow {
         contentView.addSubview(postpone1Button)
         contentView.addSubview(postpone2Button)
         contentView.addSubview(postpone5Button)
+        contentView.addSubview(postponeStatusLabel)
         
         NSLayoutConstraint.activate([
             // Main container constraints
@@ -248,7 +257,13 @@ class BreakOverlayWindow: NSWindow {
             
             // Center the button group
             postpone1Button.trailingAnchor.constraint(equalTo: postpone2Button.leadingAnchor, constant: -20),
-            postpone2Button.trailingAnchor.constraint(equalTo: postpone5Button.leadingAnchor, constant: -20)
+            postpone2Button.trailingAnchor.constraint(equalTo: postpone5Button.leadingAnchor, constant: -20),
+
+            // 底部状态标签约束
+            postponeStatusLabel.topAnchor.constraint(equalTo: postpone1Button.bottomAnchor, constant: 20),
+            postponeStatusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            postponeStatusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 40),
+            postponeStatusLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -40)
         ])
     }
     
@@ -273,25 +288,31 @@ class BreakOverlayWindow: NSWindow {
     
     func showOverlay() {
         print("🎭 显示休息覆盖窗口")
-        
+
+        // 先清理旧的监听器，避免重复
+        if let monitor = keyboardMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyboardMonitor = nil
+        }
+
         // 确保按钮启用
         postpone1Button.isEnabled = true
         postpone2Button.isEnabled = true
         postpone5Button.isEnabled = true
-        
+
         // Make window key and front
         makeKeyAndOrderFront(nil)
-        
+
         // Force the application and window to become active
         NSApp.activate(ignoringOtherApps: true)
         makeKey()
         makeFirstResponder(self)
-        
+
         print("🎭 窗口焦点状态: isKeyWindow=\(isKeyWindow), canBecomeKey=\(canBecomeKey)")
-        
+
         // Set up global keyboard monitoring for shortcuts
         setupKeyboardMonitoring()
-        
+
         // Additional attempts to ensure keyboard focus
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NSApp.activate(ignoringOtherApps: true)
@@ -335,34 +356,51 @@ class BreakOverlayWindow: NSWindow {
     }
     
     func updateCountdown(_ seconds: Int) {
-        countdownLabel.stringValue = "\(seconds)"
+        // 防止显示负数或异常值
+        let displaySeconds = max(0, seconds)
+        countdownLabel.stringValue = "\(displaySeconds)"
+
+        // 如果倒计时为0但窗口仍在显示，可能存在问题
+        if displaySeconds == 0 && isVisible {
+            print("⚠️ 休息窗口倒计时已为0但仍在显示，可能存在异常")
+        }
     }
     
-    func setRemainingPostpone5Count(_ count: Int) {
-        remainingPostpone5Count = count
-        updatePostponeButtons()
-    }
-    
-    private func updatePostponeButtons() {
-        // 推迟1分钟和2分钟按钮始终启用
-        postpone1Button.isEnabled = true
-        postpone2Button.isEnabled = true
-        
-        // 推迟5分钟按钮根据剩余次数启用/禁用
-        postpone5Button.isEnabled = remainingPostpone5Count > 0
-        
-        // 更新按钮标题
+    /// 更新推迟状态显示（累计时长限制）
+    func updatePostponeStatus(used: Int, remaining: Int) {
+        // 更新按钮禁用状态和视觉样式
+        updateButtonState(postpone1Button, enabled: remaining >= 1)
+        updateButtonState(postpone2Button, enabled: remaining >= 2)
+        updateButtonState(postpone5Button, enabled: remaining >= 5)
+
+        // 更新底部状态文字
         if let localizer = localizer {
-            // 推迟1分钟和2分钟按钮正常显示
-            postpone1Button.title = localizer("postpone1")
-            postpone2Button.title = localizer("postpone2")
-            
-            // 推迟5分钟按钮显示剩余次数
-            if remainingPostpone5Count > 0 {
-                postpone5Button.title = "\(localizer("postpone5")) (\(remainingPostpone5Count))"
+            if used > 0 || remaining < 10 {
+                // 显示推迟状态
+                let statusText = String(format: localizer("postpone_status"), used, remaining)
+                postponeStatusLabel.stringValue = statusText
+                postponeStatusLabel.isHidden = false
             } else {
-                postpone5Button.title = localizer("postpone5")
+                // 首次显示休息窗口，未推迟过
+                postponeStatusLabel.isHidden = true
             }
+        }
+    }
+
+    /// 更新按钮的启用状态和视觉样式
+    private func updateButtonState(_ button: NSButton, enabled: Bool) {
+        button.isEnabled = enabled
+
+        if enabled {
+            // 启用状态：正常样式
+            button.alphaValue = 1.0
+            button.contentTintColor = nil  // 使用默认颜色
+            button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor
+        } else {
+            // 禁用状态：灰化样式
+            button.alphaValue = 0.5
+            button.contentTintColor = NSColor.disabledControlTextColor
+            button.layer?.backgroundColor = NSColor.systemGray.withAlphaComponent(0.1).cgColor
         }
     }
     
@@ -394,8 +432,10 @@ class BreakOverlayWindow: NSWindow {
             }
         }
         
-        // 更新按钮文本时也要显示剩余次数
-        updatePostponeButtons()
+        // 更新按钮文本
+        postpone1Button.title = localizer("postpone1")
+        postpone2Button.title = localizer("postpone2")
+        postpone5Button.title = localizer("postpone5")
     }
     
     @objc private func postpone1ButtonClicked() {

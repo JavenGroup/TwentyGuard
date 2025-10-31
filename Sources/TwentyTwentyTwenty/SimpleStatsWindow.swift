@@ -1,8 +1,9 @@
 import Cocoa
 
 class SimpleStatsWindow: NSWindow {
-    
-    private let analyzer = HealthAnalyzer.shared
+
+    private let eventRecorder = EventRecorder.shared
+    private let statsDB = StatsDatabase.shared
     private var localizer: ((String) -> String)?
     
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
@@ -61,23 +62,22 @@ class SimpleStatsWindow: NSWindow {
         let loadingLabel = createLabel("正在加载...", fontSize: 14, color: .secondaryLabelColor)
         loadingLabel.frame = NSRect(x: 150, y: 250, width: 100, height: 20)
         containerView.addSubview(loadingLabel)
-        
-        // 异步加载数据
+
+        // 异步加载数据（使用新的数据库查询）
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            
-            let todayStats = self.analyzer.getTodayHealthStats()
-            let weeklyTrend = self.analyzer.getWeeklyHealthTrend()
-            let intensivePeriods = self.analyzer.getTodayIntensiveWorkPeriods()
-            
+
+            let todayStats = self.eventRecorder.getTodayStats()
+            let weeklyStats = self.eventRecorder.getWeeklyStats()
+
             DispatchQueue.main.async {
                 containerView.subviews.forEach { $0.removeFromSuperview() }
-                self.displayContent(in: containerView, todayStats: todayStats, weeklyTrend: weeklyTrend, intensivePeriods: intensivePeriods)
+                self.displayContent(in: containerView, todayStats: todayStats, weeklyStats: weeklyStats)
             }
         }
     }
     
-    private func displayContent(in containerView: NSView, todayStats: DailyHealthStats?, weeklyTrend: WeeklyHealthTrend?, intensivePeriods: [IntensiveWorkPeriod]) {
+    private func displayContent(in containerView: NSView, todayStats: DailyStats?, weeklyStats: [(Date, DailyStats)]) {
         var yPos: CGFloat = 440
         
         // 标题
@@ -107,53 +107,62 @@ class SimpleStatsWindow: NSWindow {
         yPos -= 30
         
         if let stats = todayStats {
-            // 平均休息间隔
-            let intervalMinutes = Int(stats.averageRestInterval / 60)
-            let intervalStatus = intervalMinutes <= 30 ? "✅" : "⚠️"
-            let intervalLabel = createDataRow(
-                label: "平均休息间隔：",
-                value: "\(intervalMinutes) 分钟",
-                status: intervalStatus
+            // 工作会话数
+            let workSessionsLabel = createDataRow(
+                label: "工作会话：",
+                value: "\(stats.workSessions) 次",
+                status: ""
             )
-            intervalLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
-            containerView.addSubview(intervalLabel)
-            
+            workSessionsLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
+            containerView.addSubview(workSessionsLabel)
+
             yPos -= 24
-            
-            // 最长连续用眼
-            let longestHours = stats.longestContinuousWork / 3600
-            let longestStatus = longestHours <= 1.5 ? "✅" : "🔴"
+
+            // 最长连续工作
+            let longestMinutes = stats.longestWorkMinutes
+            let longestStatus = longestMinutes <= 90 ? "✅" : "🔴"
             let longestLabel = createDataRow(
-                label: "最长连续用眼：",
-                value: String(format: "%.1f 小时", longestHours),
+                label: "最长连续工作：",
+                value: "\(longestMinutes) 分钟",
                 status: longestStatus
             )
             longestLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
             containerView.addSubview(longestLabel)
-            
+
             yPos -= 24
-            
-            // 完整休息次数
+
+            // 完成休息次数
             let breaksLabel = createDataRow(
-                label: "完整休息次数：",
-                value: "\(stats.completedBreaks) 次",
+                label: "完成休息次数：",
+                value: "\(stats.breakSessions) 次",
                 status: ""
             )
             breaksLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
             containerView.addSubview(breaksLabel)
-            
+
             yPos -= 24
-            
-            // 推迟率
-            let postponeRate = Int(stats.postponeRate * 100)
+
+            // 推迟情况
+            let postponeRate = stats.totalPostpones > 0 ? Double(stats.totalPostpones) / Double(stats.workSessions) * 100 : 0
             let postponeStatus = postponeRate <= 30 ? "✅" : "⚠️"
             let postponeLabel = createDataRow(
-                label: "推迟率：",
-                value: "\(postponeRate)%",
+                label: "推迟次数：",
+                value: "\(stats.totalPostpones) 次 (\(Int(postponeRate))%)",
                 status: postponeStatus
             )
             postponeLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
             containerView.addSubview(postponeLabel)
+
+            yPos -= 24
+
+            // 推迟细节
+            if stats.totalPostpones > 0 {
+                let detailText = "1分钟:\(stats.postpone1MinCount)次 2分钟:\(stats.postpone2MinCount)次 5分钟:\(stats.postpone5MinCount)次"
+                let detailLabel = createLabel(detailText, fontSize: 11, color: .secondaryLabelColor)
+                detailLabel.frame = NSRect(x: 50, y: yPos, width: 340, height: 18)
+                containerView.addSubview(detailLabel)
+                yPos -= 22
+            }
         } else {
             let noDataLabel = createLabel("暂无今日数据", fontSize: 14, color: .tertiaryLabelColor)
             noDataLabel.frame = NSRect(x: 30, y: yPos, width: 340, height: 20)
@@ -169,30 +178,32 @@ class SimpleStatsWindow: NSWindow {
         
         yPos -= 25
         
-        // 高强度时段标题
-        let intensiveTitle = createLabel("⏰ 高强度用眼时段", fontSize: 15, weight: .semibold)
+        // 高强度时段标题（基于数据库的最长工作时长）
+        let intensiveTitle = createLabel("⏰ 今日最长工作时段", fontSize: 15, weight: .semibold)
         intensiveTitle.frame = NSRect(x: 20, y: yPos, width: 360, height: 20)
         containerView.addSubview(intensiveTitle)
-        
+
         yPos -= 30
-        
-        if intensivePeriods.isEmpty {
-            let goodLabel = createLabel("✅ 今日无超长连续用眼", fontSize: 14, color: .systemGreen)
+
+        if let stats = todayStats, stats.longestWorkMinutes > 0 {
+            let hours = stats.longestWorkMinutes / 60
+            let minutes = stats.longestWorkMinutes % 60
+            let timeText = hours > 0 ? String(format: "%d小时%d分钟", hours, minutes) : "\(minutes)分钟"
+            let status = stats.longestWorkMinutes > 90 ? "🔴" : stats.longestWorkMinutes > 60 ? "🟡" : "✅"
+
+            let periodLabel = createDataRow(
+                label: "最长连续：",
+                value: timeText,
+                status: status
+            )
+            periodLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
+            containerView.addSubview(periodLabel)
+            yPos -= 25
+        } else {
+            let goodLabel = createLabel("✅ 今日无超长连续工作", fontSize: 14, color: .systemGreen)
             goodLabel.frame = NSRect(x: 30, y: yPos, width: 340, height: 20)
             containerView.addSubview(goodLabel)
             yPos -= 25
-        } else {
-            for period in intensivePeriods.prefix(2) {
-                let periodStatus = period.durationHours > 2.5 ? "🔴" : "🟡"
-                let periodLabel = createDataRow(
-                    label: "\(periodStatus) \(period.hourRange)",
-                    value: String(format: "连续 %.1f 小时", period.durationHours),
-                    status: ""
-                )
-                periodLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
-                containerView.addSubview(periodLabel)
-                yPos -= 24
-            }
         }
         
         yPos -= 10
@@ -205,53 +216,64 @@ class SimpleStatsWindow: NSWindow {
         yPos -= 25
         
         // 本周趋势标题
-        let trendTitle = createLabel("📈 本周改善趋势", fontSize: 15, weight: .semibold)
+        let trendTitle = createLabel("📈 本周统计", fontSize: 15, weight: .semibold)
         trendTitle.frame = NSRect(x: 20, y: yPos, width: 360, height: 20)
         containerView.addSubview(trendTitle)
-        
+
         yPos -= 30
-        
-        if let trend = weeklyTrend {
-            // 推迟率对比
-            let currentPostpone = Int(trend.currentWeek.averagePostponeRate * 100)
-            let previousPostpone = Int(trend.previousWeek.averagePostponeRate * 100)
-            let postponeImproved = currentPostpone < previousPostpone
-            let postponeArrow = postponeImproved ? "✅" : "📉"
-            
-            let postponeTrend = createDataRow(
-                label: "推迟率：",
-                value: "\(previousPostpone)% → \(currentPostpone)%",
-                status: postponeArrow
+
+        if !weeklyStats.isEmpty {
+            // 计算本周汇总数据
+            var totalWorkSessions = 0
+            var totalBreakSessions = 0
+            var totalPostpones = 0
+            var healthyDays = 0
+
+            for (_, dayStats) in weeklyStats {
+                totalWorkSessions += dayStats.workSessions
+                totalBreakSessions += dayStats.breakSessions
+                totalPostpones += dayStats.totalPostpones
+
+                // 定义健康日标准：至少休息3次，推迟率<50%
+                let postponeRate = dayStats.workSessions > 0 ? Double(dayStats.totalPostpones) / Double(dayStats.workSessions) : 0
+                if dayStats.breakSessions >= 3 && postponeRate < 0.5 {
+                    healthyDays += 1
+                }
+            }
+
+            // 工作总时长
+            let totalWorkMinutes = weeklyStats.reduce(0) { $0 + $1.1.totalWorkMinutes }
+            let workHours = totalWorkMinutes / 60
+            let workLabel = createDataRow(
+                label: "总工作时长：",
+                value: "\(workHours) 小时",
+                status: ""
             )
-            postponeTrend.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
-            containerView.addSubview(postponeTrend)
-            
+            workLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
+            containerView.addSubview(workLabel)
+
             yPos -= 24
-            
-            // 休息间隔对比
-            let currentInterval = Int(trend.currentWeek.averageRestInterval / 60)
-            let previousInterval = Int(trend.previousWeek.averageRestInterval / 60)
-            let intervalImproved = currentInterval < previousInterval
-            let intervalArrow = intervalImproved ? "✅" : "📉"
-            
-            let intervalTrend = createDataRow(
-                label: "休息间隔：",
-                value: "\(previousInterval)分 → \(currentInterval)分",
-                status: intervalArrow
+
+            // 健康天数
+            let healthyDaysLabel = createDataRow(
+                label: "健康天数：",
+                value: "\(healthyDays)/\(weeklyStats.count) 天",
+                status: healthyDays >= 5 ? "🎉" : ""
             )
-            intervalTrend.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
-            containerView.addSubview(intervalTrend)
-            
+            healthyDaysLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
+            containerView.addSubview(healthyDaysLabel)
+
             yPos -= 24
-            
-            // 连续天数
-            let consecutiveLabel = createLabel(
-                "🔥 连续健康使用 \(trend.consecutiveHealthyDays) 天",
-                fontSize: 14,
-                color: .systemOrange
+
+            // 周推迟统计
+            let avgPostponeRate = totalWorkSessions > 0 ? Double(totalPostpones) / Double(totalWorkSessions) * 100 : 0
+            let postponeLabel = createDataRow(
+                label: "周推迟率：",
+                value: String(format: "%.0f%%", avgPostponeRate),
+                status: avgPostponeRate <= 30 ? "✅" : "⚠️"
             )
-            consecutiveLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
-            containerView.addSubview(consecutiveLabel)
+            postponeLabel.frame = NSRect(x: 30, y: yPos, width: 360, height: 20)
+            containerView.addSubview(postponeLabel)
         } else {
             let noDataLabel = createLabel("暂无趋势数据", fontSize: 14, color: .tertiaryLabelColor)
             noDataLabel.frame = NSRect(x: 30, y: yPos, width: 340, height: 20)
