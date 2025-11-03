@@ -116,7 +116,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "ok": "确定",
             "eyeHealthStats": "👁️ 眼睛健康统计",
             "close": "关闭",
-            "eye_health_report": "👁️ 眼睛健康报告"
+            "eye_health_report": "👁️ 眼睛健康报告",
+            "about": "关于"
         ],
         "en": [
             "screenUsage": "Screen Time",
@@ -145,7 +146,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "ok": "OK",
             "eyeHealthStats": "👁️ Eye Health Stats",
             "close": "Close",
-            "eye_health_report": "👁️ Eye Health Report"
+            "eye_health_report": "👁️ Eye Health Report",
+            "about": "About"
         ],
         "es": [
             "screenUsage": "Tiempo de Pantalla",
@@ -174,7 +176,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "ok": "OK",
             "eyeHealthStats": "👁️ Estadísticas de Salud Ocular",
             "close": "Cerrar",
-            "eye_health_report": "👁️ Informe de Salud Ocular"
+            "eye_health_report": "👁️ Informe de Salud Ocular",
+            "about": "Acerca de"
         ],
         "ja": [
             "screenUsage": "画面使用時間",
@@ -200,7 +203,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone_status": "%d分延期済み、残り%d分",
             "eyeHealthStats": "👁️ 目の健康統計",
             "close": "閉じる",
-            "eye_health_report": "👁️ 目の健康レポート"
+            "eye_health_report": "👁️ 目の健康レポート",
+            "about": "アプリについて"
         ],
         "ko": [
             "screenUsage": "화면 사용 시간",
@@ -226,7 +230,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postpone_status": "%d분 연기됨, %d분 남음",
             "eyeHealthStats": "👁️ 눈 건강 통계",
             "close": "닫기",
-            "eye_health_report": "👁️ 눈 건강 보고서"
+            "eye_health_report": "👁️ 눈 건강 보고서",
+            "about": "정보"
         ]
     ]
     
@@ -485,7 +490,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         healthStatsItem.target = self
         healthStatsItem.keyEquivalentModifierMask = .command
         menu.addItem(healthStatsItem)
-        
+
+        let aboutItem = NSMenuItem(title: localized("about"), action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         menu.addItem(NSMenuItem.separator())
         
         setupModeMenu()
@@ -765,7 +774,151 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         print("📊 统计窗口已创建并显示")
     }
-    
+
+    @objc private func showAbout() {
+        print("📖 showAbout 被调用")
+
+        // 读取版本历史 JSON 文件
+        guard let versionData = loadVersionHistory() else {
+            print("❌ 无法加载版本历史")
+            // 使用默认信息显示
+            showAboutPanelWithDefaults()
+            return
+        }
+
+        print("✅ 成功加载版本历史数据")
+
+        // 构建显示内容
+        let appName = versionData["app_name"] as? String ?? "20-20-20"
+        let version = versionData["current_version"] as? String ?? "1.1.0"
+
+        var creditsText = ""
+
+        // 添加当前版本信息
+        if let versions = versionData["versions"] as? [[String: Any]],
+           let currentVersionInfo = versions.first,
+           let versionNumber = currentVersionInfo["version"] as? String,
+           let date = currentVersionInfo["date"] as? String,
+           let changes = currentVersionInfo["changes"] as? [String] {
+
+            creditsText += "Version \(versionNumber) - \(date)\n\n"
+            creditsText += "What's New:\n"
+            for change in changes {
+                creditsText += "• \(change)\n"
+            }
+            creditsText += "\n"
+        }
+
+        // 添加作者信息
+        if let author = versionData["author"] as? [String: String],
+           let name = author["name"],
+           let email = author["email"],
+           let github = author["github"] {
+            creditsText += "Author: \(name)\n"
+            creditsText += "Email: \(email)\n"
+            creditsText += "GitHub: \(github)\n"
+        }
+
+        print("📝 Credits 内容:\n\(creditsText)")
+
+        // 创建 attributed string
+        let credits = NSAttributedString(string: creditsText, attributes: [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.labelColor
+        ])
+
+        // 显示标准 About Panel
+        let options: [NSApplication.AboutPanelOptionKey: Any] = [
+            .applicationName: appName,
+            .applicationVersion: version,
+            .version: version,
+            .credits: credits
+        ]
+
+        // 激活应用确保窗口显示
+        NSApp.activate(ignoringOtherApps: true)
+
+        print("🪟 准备显示 About Panel")
+        NSApp.orderFrontStandardAboutPanel(options: options)
+        print("✅ About Panel 已调用显示")
+    }
+
+    private func loadVersionHistory() -> [String: Any]? {
+        // 方法 1: 尝试从资源包加载
+        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyTwentyTwenty_TwentyTwentyTwenty", withExtension: "bundle"),
+           let resourceBundle = Bundle(url: bundle),
+           let jsonPath = resourceBundle.path(forResource: "version-history", ofType: "json", inDirectory: "Resources") {
+
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: jsonPath))
+                let json = try JSONSerialization.jsonObject(with: data, options: [])
+                if let dict = json as? [String: Any] {
+                    print("✅ 成功从资源包加载版本历史: \(jsonPath)")
+                    return dict
+                }
+            } catch {
+                print("⚠️ 解析版本历史失败 (\(jsonPath)): \(error)")
+            }
+        }
+
+        // 方法 2: 尝试从主 bundle 的 Resources 目录加载
+        if let jsonPath = Bundle.main.path(forResource: "version-history", ofType: "json", inDirectory: "Resources") {
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: jsonPath))
+                let json = try JSONSerialization.jsonObject(with: data, options: [])
+                if let dict = json as? [String: Any] {
+                    print("✅ 成功从主 bundle 加载版本历史: \(jsonPath)")
+                    return dict
+                }
+            } catch {
+                print("⚠️ 解析版本历史失败 (\(jsonPath)): \(error)")
+            }
+        }
+
+        // 方法 3: 尝试从主 bundle 根目录加载
+        if let jsonPath = Bundle.main.path(forResource: "version-history", ofType: "json") {
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: jsonPath))
+                let json = try JSONSerialization.jsonObject(with: data, options: [])
+                if let dict = json as? [String: Any] {
+                    print("✅ 成功从主 bundle 根目录加载版本历史: \(jsonPath)")
+                    return dict
+                }
+            } catch {
+                print("⚠️ 解析版本历史失败 (\(jsonPath)): \(error)")
+            }
+        }
+
+        print("⚠️ 未找到版本历史文件")
+        return nil
+    }
+
+    private func showAboutPanelWithDefaults() {
+        print("⚠️ 使用默认信息显示 About Panel")
+
+        // 使用默认信息显示
+        let defaultCredits = NSAttributedString(
+            string: "20-20-20 Eye Protection App\n\nAuthor: Javen Fang\nEmail: javen.out@gmail.com\nGitHub: @javenfang",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.labelColor
+            ]
+        )
+
+        let options: [NSApplication.AboutPanelOptionKey: Any] = [
+            .applicationName: "20-20-20",
+            .applicationVersion: "1.1.0",
+            .version: "1.1.0",
+            .credits: defaultCredits
+        ]
+
+        // 激活应用确保窗口显示
+        NSApp.activate(ignoringOtherApps: true)
+
+        NSApp.orderFrontStandardAboutPanel(options: options)
+        print("✅ About Panel（默认）已调用显示")
+    }
+
     @objc private func toggleLoginItem() {
         let currentState = UserDefaults.standard.bool(forKey: "loginItemEnabled")
         let newState = !currentState

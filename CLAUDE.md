@@ -8,10 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **本文档**: 开发快速入口，提供**构建流程和关键开发注意事项**。
 
-**完整文档**:
+**当前实现文档 (v1.1.0)**:
 - **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - 功能需求文档：完整的功能列表和用户场景
 - **[docs/architecture.md](docs/architecture.md)** - 技术架构文档：深入的实现细节和维护指南
 - **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug 修复历史：问题根因分析和修复记录
+
+**历史归档文档**:
+- **[docs/prd-statistics-requirements.md](docs/prd-statistics-requirements.md)** - 统计需求变更（v1.1.0 已实施）
+- **[docs/design-statistics-system.md](docs/design-statistics-system.md)** - 统计系统设计（v1.1.0 已实施）
 
 ---
 
@@ -136,6 +140,37 @@ make launch     # 步骤3: 启动新版本
 - **构建管理**: 所有构建通过 Makefile 统一管理
 - **Asset Management**: 资源文件在 Sources/ 目录中集中管理
 
+### 📦 版本发布检查清单
+
+**⚠️ 每次发布新版本前必须检查：**
+
+1. **更新版本历史文件**：[Sources/TwentyTwentyTwenty/Resources/version-history.json](Sources/TwentyTwentyTwenty/Resources/version-history.json)
+   - 更新 `current_version` 字段（如 "1.2.0"）
+   - 在 `versions` 数组**开头**添加新版本记录
+   - 包含：版本号、日期（YYYY-MM-DD）、主要变更列表
+   - 保持版本按时间倒序排列（最新版本在最前）
+
+2. **验证「关于」页面**：
+   ```bash
+   make install && make launch
+   # 点击菜单栏 → 关于 → 确认版本信息正确
+   ```
+
+3. **示例版本记录**：
+   ```json
+   {
+     "version": "1.2.0",
+     "date": "2025-01-20",
+     "changes": [
+       "Added new feature X",
+       "Fixed bug Y",
+       "Improved performance Z"
+     ]
+   }
+   ```
+
+**为什么重要**：version-history.json 是「关于」页面的唯一数据源，忘记更新将导致用户看到过时的版本信息。
+
 ### 🚨 Critical Update Process
 **每次修改代码后的必要步骤：**
 
@@ -150,11 +185,6 @@ make launch     # 步骤3: 启动新版本
    make launch   # 启动新版本
    ```
 
-3. **验证修复**：
-   - 检查会话状态文件：`currentWorkDuration` 应该是 1800（30分钟）
-   - 测试系统唤醒行为：合盖/锁屏/屏保后应该重置为新的30分钟工作周期
-   - 测试推迟功能：累计推迟不超过10分钟，按钮动态禁用
-
 ### 🐛 常见问题快速排查
 
 **症状：倒计时不准确或版本混乱**
@@ -168,13 +198,3 @@ make launch     # 步骤3: 启动新版本
 - 日志查看方法和数据库检查命令
 - 性能监控指标
 
-## 📱 App Store Readiness
-
-- ✅ **Bundle ID**: `com.example.twentytwentytwenty`
-- ✅ **App Name**: "20-20-20"
-- ✅ **Version**: 1.0
-- ✅ **Minimum macOS**: 12.0
-- ✅ **Code Signing**: Configured
-- ✅ **Size**: ~952KB (extremely lightweight)
-
-The app is ready for App Store submission or direct distribution.

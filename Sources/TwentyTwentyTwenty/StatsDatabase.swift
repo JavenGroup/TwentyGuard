@@ -4,23 +4,39 @@ import AppKit
 
 // MARK: - Data Models
 
+// Postpone record in JSON
+struct PostponeRecord: Codable {
+    let duration: Int               // seconds: 60/120/300
+    let start_time: Double          // Unix timestamp
+    var end_time: Double?           // Unix timestamp or nil
+    var status: String              // "active" | "completed" | "interrupted"
+}
+
+// Break info in JSON
+struct BreakInfo: Codable {
+    let planned_duration: Int       // seconds, usually 180
+    var actual_duration: Int?       // seconds
+    let start_time: Double          // Unix timestamp
+    var end_time: Double?           // Unix timestamp or nil
+    var status: String              // "active" | "completed" | "interrupted"
+}
+
 struct SessionRecord {
     let id: Int64
     let type: SessionType
     let startTime: Date
     let endTime: Date?
     let plannedDuration: Int
-    let actualDuration: Int?
+    let actualWorkDuration: Int?
     let postponeCount: Int
-    let postpone1Min: Int
-    let postpone2Min: Int
-    let postpone5Min: Int
-    let totalPostponeDuration: Int
+    let postponeTotalDuration: Int
+    let postpones: [PostponeRecord]
+    let breakInfo: BreakInfo?
+    let breakCompleted: Bool
     let status: SessionStatus
 
     enum SessionType: String {
         case work = "work"
-        case breakTime = "break"  // 'break' is reserved keyword
     }
 
     enum SessionStatus: String {
@@ -97,32 +113,30 @@ class StatsDatabase {
     }
 
     private func createTablesManually() {
+        // Check if migration is needed
+        if needsMigration() {
+            performMigration()
+        }
+
         // Direct table creation without error throwing
         let tables = [
             """
             CREATE TABLE IF NOT EXISTS sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type TEXT CHECK(type IN ('work', 'break')) NOT NULL,
+                type TEXT CHECK(type IN ('work')) NOT NULL,
                 start_time REAL NOT NULL,
                 end_time REAL,
-                planned_duration INTEGER NOT NULL,
-                actual_duration INTEGER,
+                status TEXT CHECK(status IN ('active', 'completed', 'interrupted')) DEFAULT 'active',
+
+                planned_duration INTEGER DEFAULT 1800,
+                actual_work_duration INTEGER,
                 postpone_count INTEGER DEFAULT 0,
-                postpone_1min INTEGER DEFAULT 0,
-                postpone_2min INTEGER DEFAULT 0,
-                postpone_5min INTEGER DEFAULT 0,
-                postpone_total_minutes INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'active',
+                postpone_total_duration INTEGER DEFAULT 0,
+                postpones TEXT,
+                break_info TEXT,
+                break_completed INTEGER DEFAULT 0,
+
                 created_at REAL DEFAULT (strftime('%s', 'now'))
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS postpone_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                postpone_minutes INTEGER NOT NULL,
-                timestamp REAL NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
             """,
             """
@@ -148,7 +162,52 @@ class StatsDatabase {
         }
 
         isValid = true
-        print("✅ Database tables created manually, database is now valid")
+        print("✅ Database tables created (v1.2.0), database is now valid")
+    }
+
+    private func needsMigration() -> Bool {
+        // Check if sessions table has the new JSON fields
+        var stmt: OpaquePointer?
+        let query = "PRAGMA table_info(sessions)"
+
+        guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK else {
+            return false
+        }
+
+        var hasPostponesField = false
+        var hasBreakInfoField = false
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let namePtr = sqlite3_column_text(stmt, 1) {
+                let columnName = String(cString: namePtr)
+                if columnName == "postpones" {
+                    hasPostponesField = true
+                }
+                if columnName == "break_info" {
+                    hasBreakInfoField = true
+                }
+            }
+        }
+
+        sqlite3_finalize(stmt)
+
+        // Need migration if table exists but doesn't have new fields
+        return !hasPostponesField || !hasBreakInfoField
+    }
+
+    private func performMigration() {
+        print("⚠️ Detected old database version, performing migration...")
+
+        // Rename old table
+        sqlite3_exec(db, "ALTER TABLE sessions RENAME TO sessions_v1_backup", nil, nil, nil)
+
+        // Clear daily summary
+        sqlite3_exec(db, "DELETE FROM daily_summary", nil, nil, nil)
+
+        // Drop old postpone_events table if exists
+        sqlite3_exec(db, "DROP TABLE IF EXISTS postpone_events", nil, nil, nil)
+
+        print("✅ Migration completed: old data backed up to sessions_v1_backup")
     }
 
     private func openDatabase() throws {
@@ -165,6 +224,62 @@ class StatsDatabase {
         try executeSQL("PRAGMA journal_mode = WAL")
 
         print("✅ Database opened successfully at \(dbPath)")
+    }
+
+    // MARK: - JSON Helper Methods
+
+    private func parsePostpones(_ jsonString: String?) -> [PostponeRecord] {
+        guard let jsonString = jsonString,
+              !jsonString.isEmpty,
+              let data = jsonString.data(using: .utf8) else {
+            return []
+        }
+
+        do {
+            return try JSONDecoder().decode([PostponeRecord].self, from: data)
+        } catch {
+            print("⚠️ Failed to parse postpones JSON: \(error)")
+            return []
+        }
+    }
+
+    private func serializePostpones(_ postpones: [PostponeRecord]) -> String {
+        do {
+            let data = try JSONEncoder().encode(postpones)
+            return String(data: data, encoding: .utf8) ?? "[]"
+        } catch {
+            print("⚠️ Failed to serialize postpones: \(error)")
+            return "[]"
+        }
+    }
+
+    private func parseBreakInfo(_ jsonString: String?) -> BreakInfo? {
+        guard let jsonString = jsonString,
+              !jsonString.isEmpty,
+              let data = jsonString.data(using: .utf8) else {
+            return nil
+        }
+
+        do {
+            return try JSONDecoder().decode(BreakInfo.self, from: data)
+        } catch {
+            print("⚠️ Failed to parse break_info JSON: \(error)")
+            return nil
+        }
+    }
+
+    private func serializeBreakInfo(_ breakInfo: BreakInfo?) -> String? {
+        guard let breakInfo = breakInfo else {
+            return nil
+        }
+
+        do {
+            let data = try JSONEncoder().encode(breakInfo)
+            return String(data: data, encoding: .utf8)
+        } catch {
+            print("⚠️ Failed to serialize break_info: \(error)")
+            return nil
+        }
     }
 
     private func closeDatabase() {
@@ -295,8 +410,8 @@ class StatsDatabase {
                     try self.endActiveSessionInternal()
 
                     let sql = """
-                        INSERT INTO sessions (type, start_time, planned_duration, status)
-                        VALUES ('work', ?, ?, 'active')
+                        INSERT INTO sessions (type, start_time, planned_duration, status, postpones, break_info, break_completed)
+                        VALUES ('work', ?, ?, 'active', '[]', NULL, 0)
                     """
 
                     var statement: OpaquePointer?
@@ -315,7 +430,7 @@ class StatsDatabase {
                     }
 
                     let sessionId = sqlite3_last_insert_rowid(self.db)
-                    print("📊 Started work session #\(sessionId)")
+                    print("📊 Started work session #\(sessionId) (v1.2.0)")
                     return sessionId
                 }
                 completion(.success(sessionId))
@@ -344,62 +459,142 @@ class StatsDatabase {
         return result
     }
 
-    func startBreakSession(plannedDuration: Int, completion: @escaping (Result<Int64, Error>) -> Void) {
+    // Start break - creates break_info JSON in the work session
+    func startBreak(plannedDuration: Int) {
         dbQueue.async { [weak self] in
-            guard let self = self, self.isValid else {
-                completion(.failure(DatabaseError.invalidState))
-                return
-            }
+            guard let self = self, self.isValid else { return }
 
             do {
-                let sessionId = try self.withTransaction {
-                    // End current work session
-                    try self.endActiveSessionInternal()
+                try self.withTransaction {
+                    // Get active work session
+                    guard let sessionId = try self.getActiveWorkSessionIdInternal() else {
+                        print("⚠️ No active work session to start break")
+                        return
+                    }
 
-                    let sql = """
-                        INSERT INTO sessions (type, start_time, planned_duration, status)
-                        VALUES ('break', ?, ?, 'active')
+                    // Create break_info JSON
+                    let breakInfo = BreakInfo(
+                        planned_duration: plannedDuration,
+                        actual_duration: nil,
+                        start_time: Date().timeIntervalSince1970,
+                        end_time: nil,
+                        status: "active"
+                    )
+
+                    let breakInfoJSON = self.serializeBreakInfo(breakInfo)
+
+                    let updateSQL = """
+                        UPDATE sessions
+                        SET break_info = ?
+                        WHERE id = ?
                     """
 
                     var statement: OpaquePointer?
                     defer { sqlite3_finalize(statement) }
 
-                    guard sqlite3_prepare_v2(self.db, sql, -1, &statement, nil) == SQLITE_OK else {
-                        throw DatabaseError.queryFailed("Failed to prepare break session insert")
+                    guard sqlite3_prepare_v2(self.db, updateSQL, -1, &statement, nil) == SQLITE_OK else {
+                        throw DatabaseError.queryFailed("Failed to prepare start break")
                     }
 
-                    let now = Date().timeIntervalSince1970
-                    sqlite3_bind_double(statement, 1, now)
-                    sqlite3_bind_int(statement, 2, Int32(plannedDuration))
+                    if let json = breakInfoJSON {
+                        sqlite3_bind_text(statement, 1, (json as NSString).utf8String, -1, nil)
+                    } else {
+                        sqlite3_bind_null(statement, 1)
+                    }
+                    sqlite3_bind_int64(statement, 2, sessionId)
 
                     guard sqlite3_step(statement) == SQLITE_DONE else {
-                        throw DatabaseError.queryFailed("Failed to insert break session")
+                        throw DatabaseError.queryFailed("Failed to start break")
                     }
 
-                    let sessionId = sqlite3_last_insert_rowid(self.db)
-                    print("📊 Started break session #\(sessionId)")
-                    return sessionId
+                    print("📊 Started break for session #\(sessionId) (v1.2.0)")
                 }
-                completion(.success(sessionId))
             } catch {
-                completion(.failure(error))
+                print("❌ Failed to start break: \(error)")
             }
         }
     }
 
-    func startBreakSession(plannedDuration: Int) -> Int64? {
-        var result: Int64?
-        let semaphore = DispatchSemaphore(value: 0)
+    // Complete break - updates break_info and marks work session as completed
+    func completeBreak() {
+        dbQueue.async { [weak self] in
+            guard let self = self, self.isValid else { return }
 
-        startBreakSession(plannedDuration: plannedDuration) { res in
-            if case .success(let id) = res {
-                result = id
+            do {
+                try self.withTransaction {
+                    // Get active work session
+                    guard let sessionId = try self.getActiveWorkSessionIdInternal() else {
+                        print("⚠️ No active work session to complete break")
+                        return
+                    }
+
+                    // Read current break_info
+                    let selectSQL = "SELECT break_info FROM sessions WHERE id = ?"
+                    var selectStmt: OpaquePointer?
+                    defer { sqlite3_finalize(selectStmt) }
+
+                    guard sqlite3_prepare_v2(self.db, selectSQL, -1, &selectStmt, nil) == SQLITE_OK else {
+                        throw DatabaseError.queryFailed("Failed to prepare select break_info")
+                    }
+
+                    sqlite3_bind_int64(selectStmt, 1, sessionId)
+
+                    var breakInfo: BreakInfo?
+                    if sqlite3_step(selectStmt) == SQLITE_ROW {
+                        if let jsonPtr = sqlite3_column_text(selectStmt, 0) {
+                            let jsonString = String(cString: jsonPtr)
+                            breakInfo = self.parseBreakInfo(jsonString)
+                        }
+                    }
+
+                    guard var breakInfo = breakInfo else {
+                        print("⚠️ No active break to complete")
+                        return
+                    }
+
+                    // Update break_info
+                    let now = Date().timeIntervalSince1970
+                    breakInfo.end_time = now
+                    breakInfo.actual_duration = Int(now - breakInfo.start_time)
+                    breakInfo.status = "completed"
+
+                    let breakInfoJSON = self.serializeBreakInfo(breakInfo)
+
+                    // Update session
+                    let updateSQL = """
+                        UPDATE sessions
+                        SET break_info = ?,
+                            break_completed = 1,
+                            status = 'completed',
+                            end_time = ?
+                        WHERE id = ?
+                    """
+
+                    var statement: OpaquePointer?
+                    defer { sqlite3_finalize(statement) }
+
+                    guard sqlite3_prepare_v2(self.db, updateSQL, -1, &statement, nil) == SQLITE_OK else {
+                        throw DatabaseError.queryFailed("Failed to prepare complete break")
+                    }
+
+                    if let json = breakInfoJSON {
+                        sqlite3_bind_text(statement, 1, (json as NSString).utf8String, -1, nil)
+                    } else {
+                        sqlite3_bind_null(statement, 1)
+                    }
+                    sqlite3_bind_double(statement, 2, now)
+                    sqlite3_bind_int64(statement, 3, sessionId)
+
+                    guard sqlite3_step(statement) == SQLITE_DONE else {
+                        throw DatabaseError.queryFailed("Failed to complete break")
+                    }
+
+                    print("📊 Completed break for session #\(sessionId) (v1.2.0)")
+                }
+            } catch {
+                print("❌ Failed to complete break: \(error)")
             }
-            semaphore.signal()
         }
-
-        semaphore.wait()
-        return result
     }
 
     func recordPostpone(minutes: Int) {
@@ -414,14 +609,40 @@ class StatsDatabase {
                         return
                     }
 
-                    // Update postpone counts
+                    // 1. Read current postpones JSON
+                    let selectSQL = "SELECT postpones FROM sessions WHERE id = ?"
+                    var selectStmt: OpaquePointer?
+                    defer { sqlite3_finalize(selectStmt) }
+
+                    guard sqlite3_prepare_v2(self.db, selectSQL, -1, &selectStmt, nil) == SQLITE_OK else {
+                        throw DatabaseError.queryFailed("Failed to prepare select postpones")
+                    }
+
+                    sqlite3_bind_int64(selectStmt, 1, sessionId)
+
+                    var currentPostpones: [PostponeRecord] = []
+                    if sqlite3_step(selectStmt) == SQLITE_ROW {
+                        if let jsonPtr = sqlite3_column_text(selectStmt, 0) {
+                            let jsonString = String(cString: jsonPtr)
+                            currentPostpones = self.parsePostpones(jsonString)
+                        }
+                    }
+
+                    // 2. Add new postpone record
+                    let newPostpone = PostponeRecord(
+                        duration: minutes * 60,
+                        start_time: Date().timeIntervalSince1970,
+                        end_time: nil,
+                        status: "active"
+                    )
+                    currentPostpones.append(newPostpone)
+
+                    // 3. Update database
                     let updateSQL = """
                         UPDATE sessions
                         SET postpone_count = postpone_count + 1,
-                            postpone_1min = postpone_1min + ?,
-                            postpone_2min = postpone_2min + ?,
-                            postpone_5min = postpone_5min + ?,
-                            total_postpone_duration = total_postpone_duration + ?
+                            postpone_total_duration = postpone_total_duration + ?,
+                            postpones = ?
                         WHERE id = ?
                     """
 
@@ -432,46 +653,20 @@ class StatsDatabase {
                         throw DatabaseError.queryFailed("Failed to prepare postpone update")
                     }
 
-                    sqlite3_bind_int(statement, 1, minutes == 1 ? 1 : 0)
-                    sqlite3_bind_int(statement, 2, minutes == 2 ? 1 : 0)
-                    sqlite3_bind_int(statement, 3, minutes == 5 ? 1 : 0)
-                    sqlite3_bind_int(statement, 4, Int32(minutes * 60))
-                    sqlite3_bind_int64(statement, 5, sessionId)
+                    let jsonString = self.serializePostpones(currentPostpones)
+                    sqlite3_bind_int(statement, 1, Int32(minutes * 60))
+                    sqlite3_bind_text(statement, 2, (jsonString as NSString).utf8String, -1, nil)
+                    sqlite3_bind_int64(statement, 3, sessionId)
 
                     guard sqlite3_step(statement) == SQLITE_DONE else {
                         throw DatabaseError.queryFailed("Failed to update postpone")
                     }
 
-                    print("📊 Recorded \(minutes) minute postpone for session #\(sessionId)")
-
-                    // Record postpone event
-                    try self.recordPostponeEventInternal(sessionId: sessionId, minutes: minutes)
+                    print("📊 Recorded \(minutes) minute postpone for session #\(sessionId) (v1.2.0)")
                 }
             } catch {
                 print("❌ Failed to record postpone: \(error)")
             }
-        }
-    }
-
-    private func recordPostponeEventInternal(sessionId: Int64, minutes: Int) throws {
-        let sql = """
-            INSERT INTO postpone_events (session_id, postpone_time, postpone_minutes)
-            VALUES (?, ?, ?)
-        """
-
-        var statement: OpaquePointer?
-        defer { sqlite3_finalize(statement) }
-
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            throw DatabaseError.queryFailed("Failed to prepare postpone event insert")
-        }
-
-        sqlite3_bind_int64(statement, 1, sessionId)
-        sqlite3_bind_double(statement, 2, Date().timeIntervalSince1970)
-        sqlite3_bind_int(statement, 3, Int32(minutes))
-
-        guard sqlite3_step(statement) == SQLITE_DONE else {
-            throw DatabaseError.queryFailed("Failed to insert postpone event")
         }
     }
 
@@ -491,7 +686,7 @@ class StatsDatabase {
         let sql = """
             UPDATE sessions
             SET end_time = ?,
-                actual_duration = ? - start_time,
+                actual_work_duration = CAST((? - start_time) AS INTEGER),
                 status = 'completed'
             WHERE status = 'active'
         """
@@ -513,7 +708,7 @@ class StatsDatabase {
 
         let changes = sqlite3_changes(db)
         if changes > 0 {
-            print("📊 Ended \(changes) active session(s)")
+            print("📊 Ended \(changes) active session(s) (v1.2.0)")
         }
     }
 

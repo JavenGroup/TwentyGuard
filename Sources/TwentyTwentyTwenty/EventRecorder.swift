@@ -49,28 +49,24 @@ class EventRecorder {
     func startBreakSession(duration: Int) {
         currentBreakDuration = duration
 
-        // End work session if active
-        endWorkSession()
-
-        // Start break in database
-        currentBreakSessionId = statsDB.startBreakSession(plannedDuration: duration)
+        // Start break in database (v1.2.0 - updates work session's break_info)
+        statsDB.startBreak(plannedDuration: duration)
 
         // Optional: Keep JSON log
         logManager.logBreakStarted(expectedDuration: duration)
 
-        print("📊 EventRecorder: Started break session with duration \(duration)s")
+        print("📊 EventRecorder: Started break with duration \(duration)s")
     }
 
     func endBreakSession() {
-        if currentBreakSessionId != nil {
-            statsDB.endActiveSession()
+        // Complete break in database (v1.2.0 - updates work session)
+        statsDB.completeBreak()
 
-            // Log break completion
-            logManager.logBreakCompleted(actualDuration: TimeInterval(currentBreakDuration), expectedDuration: currentBreakDuration)
+        // Log break completion
+        logManager.logBreakCompleted(actualDuration: TimeInterval(currentBreakDuration), expectedDuration: currentBreakDuration)
 
-            currentBreakSessionId = nil
-            print("📊 EventRecorder: Ended break session")
-        }
+        currentBreakSessionId = nil
+        print("📊 EventRecorder: Completed break")
     }
 
     // MARK: - Postpone Management

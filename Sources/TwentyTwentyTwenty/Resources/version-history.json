@@ -1,0 +1,35 @@
+{
+  "_instructions": "⚠️ IMPORTANT: Update this file before every release! See CLAUDE.md section '📦 版本发布检查清单' for instructions.",
+  "app_name": "20-20-20",
+  "bundle_id": "com.example.twentytwentytwenty",
+  "author": {
+    "name": "Javen Fang",
+    "email": "javen.out@gmail.com",
+    "github": "@javenfang"
+  },
+  "current_version": "1.1.0",
+  "versions": [
+    {
+      "version": "1.1.0",
+      "date": "2025-01-15",
+      "changes": [
+        "Smart system wake behavior: automatically start fresh work session after sleep/screensaver",
+        "Postpone mechanism with 10-minute cumulative limit to prevent abuse",
+        "Enhanced health statistics with comprehensive event tracking",
+        "Improved session recovery after system events"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-01-10",
+      "changes": [
+        "Initial release with 20-20-20 rule implementation",
+        "Menu bar application with full-screen break overlay",
+        "Multi-monitor support",
+        "5 languages: English, 简体中文, Español, 日本語, 한국어",
+        "Custom work/break duration settings",
+        "Eye health statistics tracking"
+      ]
+    }
+  ]
+}
