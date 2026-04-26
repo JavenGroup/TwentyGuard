@@ -1,8 +1,10 @@
+SWIFT_BUILD_FLAGS ?= --disable-sandbox --cache-path .build/cache --config-path .build/config --scratch-path .build
+
 build:
-	swift build -c release
+	swift build $(SWIFT_BUILD_FLAGS) -c release
 
 run:
-	swift run
+	swift run $(SWIFT_BUILD_FLAGS)
 
 clean:
 	swift package clean
@@ -11,27 +13,18 @@ clean:
 build-app: clean
 	@echo "🔨 Building standalone app..."
 	@mkdir -p build
-	@swift build -c release
+	@swift build $(SWIFT_BUILD_FLAGS) -c release
+	@rm -rf "build/20-20-20.app"
 	@mkdir -p "build/20-20-20.app/Contents/MacOS"
 	@mkdir -p "build/20-20-20.app/Contents/Resources"
 	@cp ./.build/release/TwentyTwentyTwenty "build/20-20-20.app/Contents/MacOS/"
 	@cp Info.plist "build/20-20-20.app/Contents/"
 	@cp -r Sources/TwentyTwentyTwenty.xcassets "build/20-20-20.app/Contents/Resources/"
 	@cp -r Sources/TwentyTwentyTwenty/Resources "build/20-20-20.app/Contents/Resources/"
-	@echo "🎨 Processing app icons..."
-	@mkdir -p "build/20-20-20.app/Contents/Resources/AppIcon.iconset"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/16-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_16x16.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/32-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_16x16@2x.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/32-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_32x32.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/64-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_32x32@2x.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/128-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_128x128.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/256-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_128x128@2x.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/256-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_256x256.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/512-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_256x256@2x.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/512-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_512x512.png"
-	@cp Sources/TwentyTwentyTwenty.xcassets/AppIcon.appiconset/1024-mac.png "build/20-20-20.app/Contents/Resources/AppIcon.iconset/icon_512x512@2x.png"
-	@iconutil -c icns "build/20-20-20.app/Contents/Resources/AppIcon.iconset" -o "build/20-20-20.app/Contents/Resources/AppIcon.icns"
-	@rm -rf "build/20-20-20.app/Contents/Resources/AppIcon.iconset"
+	@echo "🎨 Copying app icon..."
+	@cp Sources/TwentyTwentyTwenty/Resources/AppIcon.icns "build/20-20-20.app/Contents/Resources/AppIcon.icns"
+	@echo "🔏 Signing app bundle..."
+	@codesign --force --deep --sign - "build/20-20-20.app"
 	@echo "✅ App bundle created at build/20-20-20.app"
 
 # Create distribution DMG

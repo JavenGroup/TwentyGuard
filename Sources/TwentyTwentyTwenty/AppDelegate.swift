@@ -17,7 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var postponeStartTime: Date?
     private var postponeDuration: TimeInterval = 0
     private var totalPostponedTime: TimeInterval = 0  // 累计推迟时间（秒）
-    private let maxTotalPostponeTime: TimeInterval = 10 * 60  // 最多推迟10分钟
+    private var maxTotalPostponeTime: TimeInterval = 5 * 60  // 默认最多推迟5分钟
     
     private var timerMenuItem: NSMenuItem!
     private var breakOverlays: [BreakOverlayWindow] = []
@@ -35,9 +35,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isCustomMode: Bool = false
     private var customWorkDuration: Int = 30 * 60 // Default custom: 30 minutes
     private var customBreakDuration: Int = 30 // Default custom: 30 seconds
+    private var customPostponeLimitMinutes: Int = 5 // Default custom postpone limit
     private var modeMenuItems: [NSMenuItem] = []
     private var workDurationMenuItems: [NSMenuItem] = []
     private var breakDurationMenuItems: [NSMenuItem] = []
+    private var postponeLimitMenuItems: [NSMenuItem] = []
     private var showCountdownInStatusBar: Bool = false
     private var showCountdownMenuItem: NSMenuItem!
     
@@ -117,7 +119,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "eyeHealthStats": "👁️ 眼睛健康统计",
             "close": "关闭",
             "eye_health_report": "👁️ 眼睛健康报告",
-            "about": "关于"
+            "about": "关于",
+            "postponeLimit": "推迟上限"
         ],
         "en": [
             "screenUsage": "Screen Time",
@@ -147,7 +150,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "eyeHealthStats": "👁️ Eye Health Stats",
             "close": "Close",
             "eye_health_report": "👁️ Eye Health Report",
-            "about": "About"
+            "about": "About",
+            "postponeLimit": "Postpone Limit"
         ],
         "es": [
             "screenUsage": "Tiempo de Pantalla",
@@ -177,7 +181,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "eyeHealthStats": "👁️ Estadísticas de Salud Ocular",
             "close": "Cerrar",
             "eye_health_report": "👁️ Informe de Salud Ocular",
-            "about": "Acerca de"
+            "about": "Acerca de",
+            "postponeLimit": "Límite de Aplazamiento"
         ],
         "ja": [
             "screenUsage": "画面使用時間",
@@ -204,7 +209,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "eyeHealthStats": "👁️ 目の健康統計",
             "close": "閉じる",
             "eye_health_report": "👁️ 目の健康レポート",
-            "about": "アプリについて"
+            "about": "アプリについて",
+            "postponeLimit": "延期上限"
         ],
         "ko": [
             "screenUsage": "화면 사용 시간",
@@ -231,7 +237,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "eyeHealthStats": "👁️ 눈 건강 통계",
             "close": "닫기",
             "eye_health_report": "👁️ 눈 건강 보고서",
-            "about": "정보"
+            "about": "정보",
+            "postponeLimit": "연기 한도"
         ]
     ]
     
@@ -346,8 +353,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if workElapsed < maxWorkTime {
                     // 继续工作会话
                     workSessionStartTime = workStart
-                    // 在数据库中记录恢复的会话
-                    eventRecorder.startWorkSession(duration: currentWorkDuration)
+                    // 在数据库中记录恢复的会话，使用原始开始时间
+                    eventRecorder.startWorkSession(duration: currentWorkDuration, startTime: workStart)
                     print("🔄 恢复工作会话，已用时 \(Int(workElapsed))秒，剩余 \(Int(workTimeRemaining))秒")
                     
                     if workElapsed >= TimeInterval(currentWorkDuration) {
@@ -378,6 +385,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     // 休息时间过长，自动完成休息
                     logManager.logBreakCompleted(actualDuration: breakElapsed, expectedDuration: currentBreakDuration)
+                    eventRecorder.endBreakSession()
                     logManager.logTimerReset(reason: "break_session_overtime")
                     return false
                 }
@@ -431,14 +439,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if savedCustomBreakDuration > 0 {
             customBreakDuration = savedCustomBreakDuration
         }
-        
+
+        // Load custom-mode postpone limit setting. Default mode is always fixed at 5 minutes.
+        let savedPostponeLimit = UserDefaults.standard.integer(forKey: "maxPostponeMinutes")
+        customPostponeLimitMinutes = [5, 10].contains(savedPostponeLimit) ? savedPostponeLimit : 5
+
         // Apply the loaded settings
         if isCustomMode {
             currentWorkDuration = customWorkDuration
             currentBreakDuration = customBreakDuration
+            maxTotalPostponeTime = TimeInterval(customPostponeLimitMinutes * 60)
         } else {
             currentWorkDuration = 20 * 60
             currentBreakDuration = 20
+            maxTotalPostponeTime = 5 * 60
         }
     }
     
@@ -448,14 +462,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(customWorkDuration, forKey: "customWorkDuration")
         UserDefaults.standard.set(customBreakDuration, forKey: "customBreakDuration")
         UserDefaults.standard.set(currentLanguage, forKey: "currentLanguage")
-        
+        UserDefaults.standard.set(customPostponeLimitMinutes, forKey: "maxPostponeMinutes")
+
         // 记录设置变更
         let changes: [String: String] = [
             "show_countdown": "\(showCountdownInStatusBar)",
             "custom_mode": "\(isCustomMode)",
             "custom_work_duration": "\(customWorkDuration)",
             "custom_break_duration": "\(customBreakDuration)",
-            "language": currentLanguage
+            "language": currentLanguage,
+            "custom_postpone_limit_minutes": "\(customPostponeLimitMinutes)",
+            "effective_postpone_limit_minutes": "\(Int(maxTotalPostponeTime / 60))"
         ]
         eventRecorder.recordSettingsChange(changes: changes)
     }
@@ -490,10 +507,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         healthStatsItem.target = self
         healthStatsItem.keyEquivalentModifierMask = .command
         menu.addItem(healthStatsItem)
-
-        let aboutItem = NSMenuItem(title: localized("about"), action: #selector(showAbout), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
 
         menu.addItem(NSMenuItem.separator())
         
@@ -540,12 +553,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(showCountdownMenuItem)
         
         menu.addItem(NSMenuItem.separator())
-        
+
+        let aboutItem = NSMenuItem(title: localized("about"), action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         let quitItem = NSMenuItem(title: localized("quit"), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         quitItem.keyEquivalentModifierMask = .command
         menu.addItem(quitItem)
-        
+
         statusBarItem.menu = menu
     }
     
@@ -692,16 +709,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         breakDurationItem.submenu = breakDurationSubmenu
         menu.insertItem(breakDurationItem, at: customModeIndex + 2)
+
+        // Postpone Limit Item
+        let currentPostponeMinutes = customPostponeLimitMinutes
+        let postponeLimitItem = NSMenuItem(title: "    \(localized("postponeLimit")): \(currentPostponeMinutes) \(localized("minutes"))", action: nil, keyEquivalent: "")
+        let postponeLimitSubmenu = NSMenu()
+
+        let postponeLimits = [5, 10] // minutes
+        for limit in postponeLimits {
+            let item = NSMenuItem(title: "\(limit) \(localized("minutes"))", action: #selector(selectPostponeLimit(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = limit
+            item.state = (currentPostponeMinutes == limit) ? .on : .off
+            postponeLimitSubmenu.addItem(item)
+            postponeLimitMenuItems.append(item)
+        }
+
+        postponeLimitItem.submenu = postponeLimitSubmenu
+        menu.insertItem(postponeLimitItem, at: customModeIndex + 3)
     }
-    
+
     private func removeCustomModeSubItems() {
         // Clear sub-menu items arrays
         workDurationMenuItems.removeAll()
         breakDurationMenuItems.removeAll()
-        
+        postponeLimitMenuItems.removeAll()
+
         // Remove the main duration items from menu
-        let itemsToRemove = menu.items.filter { 
-            $0.title.hasPrefix("    \(localized("screenUsage"))") || $0.title.hasPrefix("    \(localized("screenBreak"))")
+        let itemsToRemove = menu.items.filter {
+            $0.title.hasPrefix("    \(localized("screenUsage"))") ||
+            $0.title.hasPrefix("    \(localized("screenBreak"))") ||
+            $0.title.hasPrefix("    \(localized("postponeLimit"))")
         }
         for item in itemsToRemove {
             menu.removeItem(item)
@@ -953,7 +991,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func addToLoginItems() {
-        let appPath = Bundle.main.bundlePath ?? ""
+        let appPath = Bundle.main.bundlePath
         guard !appPath.isEmpty else { return }
         
         if #available(macOS 13.0, *) {
@@ -972,7 +1010,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func removeFromLoginItems() {
-        let appPath = Bundle.main.bundlePath ?? ""
+        let appPath = Bundle.main.bundlePath
         guard !appPath.isEmpty else { return }
         
         if #available(macOS 13.0, *) {
@@ -1000,6 +1038,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let startTime = breakSessionStartTime {
             let elapsed = Date().timeIntervalSince(startTime)
             logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+            eventRecorder.endBreakSession()
         }
 
         // 使用新的事件记录器
@@ -1024,9 +1063,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCustomMode = false
         currentWorkDuration = 20 * 60
         currentBreakDuration = 20
-        
+        maxTotalPostponeTime = 5 * 60  // Default mode: 5 minutes postpone limit
+
         eventRecorder.recordModeChange(mode: "default", workDuration: currentWorkDuration, breakDuration: currentBreakDuration)
-        
+
         saveSettings()
         updateModeMenuStates()
         restartWorkTimer()
@@ -1037,6 +1077,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isCustomMode = true
             currentWorkDuration = customWorkDuration
             currentBreakDuration = customBreakDuration
+            maxTotalPostponeTime = TimeInterval(customPostponeLimitMinutes * 60)
             
             eventRecorder.recordModeChange(mode: "custom", workDuration: currentWorkDuration, breakDuration: currentBreakDuration)
             
@@ -1063,7 +1104,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateModeMenuStates()
         saveSettings()
     }
-    
+
+    @objc private func selectPostponeLimit(_ sender: NSMenuItem) {
+        customPostponeLimitMinutes = sender.tag
+        maxTotalPostponeTime = TimeInterval(customPostponeLimitMinutes * 60)
+        updateCustomModeSubItems()
+        saveSettings()
+    }
+
     private func updateModeMenuStates() {
         // Update mode states based on representedObject instead of array index
         for item in modeMenuItems {
@@ -1144,10 +1192,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateWorkTimer() {
         updateMenuTimer()
         updateStatusBarTitle()
-        
+
         // 检查推迟时间是否结束
         if isPostponeActive && postponeTimeRemaining <= 0 {
             // 推迟时间结束，清除推迟状态，开始正常休息
+            print("⏰ Postpone time finished, showing break overlay")
             workTimer?.invalidate()
             workTimer = nil
             postponeStartTime = nil
@@ -1156,6 +1205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // 检查工作时间是否已完成（添加重入保护）
         else if workTimeRemaining <= 0 && !isCompletingWorkSession {
+            print("⏰ Work time finished (remaining: \(workTimeRemaining)), completing work session")
             completeWorkSession()
         }
     }
@@ -1432,7 +1482,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let actualDuration = Date().timeIntervalSince(startTime)
             logManager.logBreakCompleted(actualDuration: actualDuration, expectedDuration: currentBreakDuration)
         }
-        
+
+        // 记录休息完成到数据库
+        eventRecorder.endBreakSession()
+
         breakSessionStartTime = nil
         totalPostponedTime = 0  // 完成休息后重置累计推迟时间
         startWorkTimer()
@@ -1603,6 +1656,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if let breakStart = breakSessionStartTime {
             let elapsed = Date().timeIntervalSince(breakStart)
             logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+            // 记录休息完成到数据库
+            eventRecorder.endBreakSession()
         }
 
         // 清理定时器

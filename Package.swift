@@ -17,7 +17,6 @@ let package = Package(
             name: "TwentyTwentyTwenty",
             dependencies: [],
             resources: [
-                .process("TwentyTwentyTwenty.xcassets"),
                 .copy("Resources")
             ]
         ),

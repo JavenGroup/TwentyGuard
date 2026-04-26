@@ -19,17 +19,21 @@ class EventRecorder {
 
     // MARK: - Work Session Management
 
-    func startWorkSession(duration: Int) {
+    func startWorkSession(duration: Int, startTime: Date? = nil) {
         currentWorkDuration = duration
 
-        // Record in database
-        currentWorkSessionId = statsDB.startWorkSession(plannedDuration: duration)
+        // Record in database with optional start time (for session restoration)
+        currentWorkSessionId = statsDB.startWorkSession(plannedDuration: duration, startTime: startTime)
         currentBreakSessionId = nil
 
         // Optional: Keep JSON log for debugging
         logManager.logWorkStarted(mode: duration == 20 * 60 ? "default" : "custom")
 
-        print("📊 EventRecorder: Started work session with duration \(duration)s")
+        if let startTime = startTime {
+            print("📊 EventRecorder: Resumed work session with duration \(duration)s, started at \(startTime)")
+        } else {
+            print("📊 EventRecorder: Started work session with duration \(duration)s")
+        }
     }
 
     func endWorkSession() {

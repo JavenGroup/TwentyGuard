@@ -4,18 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
-## 📚 文档导航
+## 🤖 AI Coding Assistant Principles
 
-**本文档**: 开发快速入口，提供**构建流程和关键开发注意事项**。
+1. **AI Coding First** - Leverage AI assistance throughout the development lifecycle
+2. **CLAUDE.md Persists English Version** - Maintain documentation in English for broader accessibility
+3. **Architecture Design Principle: KISS** - Keep It Simple, Stupid
 
-**当前实现文档 (v1.1.0)**:
-- **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - 功能需求文档：完整的功能列表和用户场景
-- **[docs/architecture.md](docs/architecture.md)** - 技术架构文档：深入的实现细节和维护指南
-- **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug 修复历史：问题根因分析和修复记录
-
-**历史归档文档**:
-- **[docs/prd-statistics-requirements.md](docs/prd-statistics-requirements.md)** - 统计需求变更（v1.1.0 已实施）
-- **[docs/design-statistics-system.md](docs/design-statistics-system.md)** - 统计系统设计（v1.1.0 已实施）
 
 ---
 
@@ -25,36 +19,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Implementation Status**: ✅ **COMPLETE** - Fully implemented and ready for production use.
 
-**Key Features**: 工作/休息循环、推迟功能、健康统计、多语言支持、系统事件智能响应
+**Key Features**: Work/break cycles, postpone functionality, health statistics, multi-language support, smart system event response
 
-📖 **详细功能说明**: 参见 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
+📖 **Detailed Features**: See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
 
-## 🎯 核心设计决策
+## 🎯 Core Design Decisions
 
-**这些是关键的设计原则，已经明确确定，不应反复讨论：**
+**These are key design principles that have been clearly established and should not be repeatedly questioned:**
 
-### 1. 系统唤醒后的行为 ⭐ (v1.1.0)
-> **无论之前什么状态，任何系统唤醒后都直接进入新的工作周期**
+### 1. Behavior After System Wake ⭐ (v1.1.0)
+> **Regardless of previous state, always start a fresh work cycle after any system wake event**
 
-**原因**:
-- 屏保/睡眠/合盖本身就是眼睛休息
-- 用户回来后应该全新开始，避免"刚打开就要休息"的体验
+**Rationale**:
+- Screensaver/sleep/lid close already provides eye rest
+- Users should start fresh to avoid "just opened, already need break" experience
 
-**触发事件**: 系统睡眠、屏幕锁定、屏保、显示器睡眠、合盖
+**Trigger Events**: System sleep, screen lock, screensaver, display sleep, lid close
 
-### 2. 推迟机制 ⭐ (v1.1.0)
-> **累计时长限制：所有推迟操作总计最多 10 分钟**
+### 2. Postpone Mechanism ⭐ (v1.2.0)
+> **Default mode limits cumulative postpones to 5 minutes; custom mode can choose 5 or 10 minutes**
 
-**原因**: 防止用户通过反复推迟绕过休息提醒
+**Rationale**: Prevent users from bypassing break reminders through repeated postpones
 
-**实现**: 动态禁用按钮 + 实时状态显示
+**Implementation**: Dynamic button disabling + real-time status display
 
-### 3. 时间计算
-> **使用绝对时间而非相对计数**
+### 3. Time Calculation
+> **Use absolute time instead of relative counting**
 
-**原因**: 避免累积误差，支持系统睡眠恢复
+**Rationale**: Avoid cumulative errors, support system sleep recovery
 
-📖 **完整设计决策**: 参见 [docs/architecture.md](docs/architecture.md#9-关键技术决策)
+📖 **Complete Design Decisions**: See [docs/architecture.md](docs/architecture.md#9-key-technical-decisions)
 
 ## Architecture
 
@@ -65,98 +59,112 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 5 languages support with runtime switching
 - Smart session recovery after sleep/screensaver
 
-📖 **详细技术架构**: 参见 [docs/architecture.md](docs/architecture.md)
-- 组件关系图、数据流、计时机制详解
-- 事件处理系统、持久化方案
-- 完整的维护指南和问题排查
+📖 **Detailed Technical Architecture**: See [docs/architecture.md](docs/architecture.md)
+- Component relationship diagrams, data flow, timing mechanism details
+- Event handling system, persistence solutions
+- Complete maintenance guide and troubleshooting
 
 ## 🏗️ Project Structure
 
-**单一项目架构** (Swift Package Manager):
-- 位置: `/Users/javenfang/Coding/20-20-20/`
-- 无需 Xcode 项目文件，全部通过 Makefile 管理
-- 核心文件: AppDelegate.swift、BreakOverlayWindow.swift、EventRecorder.swift、StatsDatabase.swift
+**Single Project Architecture** (Swift Package Manager):
+- Location: `/Users/javenfang/Projects/20-20-20/`
+- No Xcode project files needed, everything managed via Makefile
+- Core Files: AppDelegate.swift, BreakOverlayWindow.swift, EventRecorder.swift, StatsDatabase.swift
 
-📖 **完整文件说明**: 参见 [docs/architecture.md](docs/architecture.md#13-项目结构)
+📖 **Complete File Documentation**: See [docs/architecture.md](docs/architecture.md#13-project-structure)
 
-## 🚀 标准化构建流程
+---
 
-### ⚠️ 重要说明
-**本项目只有一个标准构建流程，通过 Makefile 管理。请勿使用其他方式构建，以避免版本混乱。**
+## 📚 Documentation Navigation
 
-### 标准构建命令
+**This Document**: Quick development guide with **build process and critical development notes**.
 
-#### 1. 开发调试
+**Current Implementation Docs (v1.2.0)**:
+- **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - Functional requirements: complete feature list and user scenarios
+- **[docs/architecture.md](docs/architecture.md)** - Technical architecture: in-depth implementation details and maintenance guide
+- **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug fix history: root cause analysis and fix records
+
+**Archived Historical Docs**:
+- **[docs/prd-statistics-requirements.md](docs/prd-statistics-requirements.md)** - Statistics requirements changes (implemented in v1.1.0)
+- **[docs/design-statistics-system.md](docs/design-statistics-system.md)** - Statistics system design (implemented in v1.1.0)
+
+## 🚀 Standardized Build Process
+
+### ⚠️ Important Notice
+**This project has ONE standard build process managed via Makefile. Do not use other build methods to avoid version confusion.**
+
+### Standard Build Commands
+
+#### 1. Development & Debugging
 ```bash
-cd /Users/javenfang/Coding/20-20-20/
-make run        # 直接运行开发版本（swift run）
+cd /Users/javenfang/Projects/20-20-20/
+make run        # Run development version directly (swift run)
 ```
 
-#### 2. 构建应用包
+#### 2. Build App Bundle
 ```bash
-make build-app  # 构建 .app 包到 build/20-20-20.app
-                # 这是唯一的标准构建输出位置
+make build-app  # Build .app bundle to build/20-20-20.app
+                # This is the ONLY standard build output location
 ```
 
-#### 3. 安装到 Applications
+#### 3. Install to Applications
 ```bash
-make install    # 自动执行：构建 → 杀掉旧进程 → 安装到 /Applications/
-make launch     # 启动 /Applications/ 中的版本
+make install    # Auto-execute: Build → Kill old process → Install to /Applications/
+make launch     # Launch version in /Applications/
 ```
 
-### 🚫 禁止的操作
-- **不要**在项目根目录创建 .app 文件
-- **不要**使用 Xcode 直接构建（项目无 .xcodeproj 文件）
-- **不要**手动复制 .app 到其他位置
-- **不要**同时运行多个版本的应用
+### 🚫 Forbidden Operations
+- **DO NOT** create .app files in project root directory
+- **DO NOT** build directly with Xcode (project has no .xcodeproj file)
+- **DO NOT** manually copy .app to other locations
+- **DO NOT** run multiple versions of the app simultaneously
 
-### 📁 标准目录结构
+### 📁 Standard Directory Structure
 ```
 20-20-20/
-├── build/              # 唯一的构建输出目录
-│   └── 20-20-20.app   # make build-app 的输出
-├── .build/            # Swift build 的中间文件（自动生成）
-└── Sources/           # 源代码
+├── build/              # ONLY build output directory
+│   └── 20-20-20.app   # make build-app output
+├── .build/            # Swift build intermediate files (auto-generated)
+└── Sources/           # Source code
 ```
 
-### 🔄 完整工作流程
+### 🔄 Complete Workflow
 ```bash
-# 修改代码后的标准流程
-make build-app  # 步骤1: 构建新版本
-make install    # 步骤2: 安装到 Applications
-make launch     # 步骤3: 启动新版本
+# Standard process after code modification
+make build-app  # Step 1: Build new version
+make install    # Step 2: Install to Applications
+make launch     # Step 3: Launch new version
 ```
 
-**⚠️ 重要注意事项：**
-- **build/ 目录**是唯一的构建输出位置
-- **所有构建必须通过 Makefile**，确保一致性
-- **避免版本混乱**：始终使用 `make install` 更新 Applications 版本
-
+**⚠️ Important Notes:**
+- **build/ directory** is the ONLY build output location
+- **All builds MUST go through Makefile** to ensure consistency
+- **Avoid version confusion**: Always use `make install` to update Applications version
 
 ## 🔧 Maintenance Notes
 
 ### Development Workflow
-- **Source of Truth**: Swift Package Manager project (`/Users/javenfang/Coding/20-20-20/`)
-- **构建管理**: 所有构建通过 Makefile 统一管理
-- **Asset Management**: 资源文件在 Sources/ 目录中集中管理
+- **Source of Truth**: Swift Package Manager project (`/Users/javenfang/Projects/20-20-20/`)
+- **Build Management**: All builds unified through Makefile
+- **Asset Management**: Resource files centrally managed in Sources/ directory
 
-### 📦 版本发布检查清单
+### 📦 Release Checklist
 
-**⚠️ 每次发布新版本前必须检查：**
+**⚠️ MUST check before every new release:**
 
-1. **更新版本历史文件**：[Sources/TwentyTwentyTwenty/Resources/version-history.json](Sources/TwentyTwentyTwenty/Resources/version-history.json)
-   - 更新 `current_version` 字段（如 "1.2.0"）
-   - 在 `versions` 数组**开头**添加新版本记录
-   - 包含：版本号、日期（YYYY-MM-DD）、主要变更列表
-   - 保持版本按时间倒序排列（最新版本在最前）
+1. **Update Version History File**: [Sources/TwentyTwentyTwenty/Resources/version-history.json](Sources/TwentyTwentyTwenty/Resources/version-history.json)
+   - Update `current_version` field (e.g., "1.2.0")
+   - Add new version record at **beginning** of `versions` array
+   - Include: version number, date (YYYY-MM-DD), major changes list
+   - Keep versions in reverse chronological order (newest first)
 
-2. **验证「关于」页面**：
+2. **Verify About Page**:
    ```bash
    make install && make launch
-   # 点击菜单栏 → 关于 → 确认版本信息正确
+   # Click menu bar → About → Confirm version info is correct
    ```
 
-3. **示例版本记录**：
+3. **Example Version Record**:
    ```json
    {
      "version": "1.2.0",
@@ -169,32 +177,75 @@ make launch     # 步骤3: 启动新版本
    }
    ```
 
-**为什么重要**：version-history.json 是「关于」页面的唯一数据源，忘记更新将导致用户看到过时的版本信息。
+**Why Important**: version-history.json is the ONLY data source for the About page. Forgetting to update will show outdated version info to users.
 
 ### 🚨 Critical Update Process
-**每次修改代码后的必要步骤：**
+**Required steps after every code modification:**
 
-1. **开发和测试**：
+1. **Development & Testing**:
    ```bash
-   make build && make run  # 开发版本测试
+   make build && make run  # Test development version
    ```
 
-2. **更新Applications版本**（必须步骤）：
+2. **Update Applications Version** (REQUIRED):
    ```bash
-   make install  # 一键替换Applications中的版本
-   make launch   # 启动新版本
+   make install  # One-command replace Applications version
+   make launch   # Launch new version
    ```
 
-### 🐛 常见问题快速排查
+### 📊 Statistics Debugging Checklist
 
-**症状：倒计时不准确或版本混乱**
-- **解决**：`make install` 重新安装最新版本
+**⚠️ Important: When debugging statistics issues, ALWAYS check JSONL log files first!**
 
-**症状：推迟功能异常**
-- **检查**：推迟逻辑不应修改 `currentWorkDuration`
+JSONL is the source of truth for event records; database is the query optimization layer. Any statistics issues should start investigation from JSONL.
 
-📖 **完整问题排查**: 参见 [docs/architecture.md](docs/architecture.md#101-常见问题排查)
-- 详细的症状分析和解决方案
-- 日志查看方法和数据库检查命令
-- 性能监控指标
+**When statistics window shows no data, check in this order:**
 
+1. **First Check JSONL Files** (are events recorded):
+   ```bash
+   cat ~/Library/Application\ Support/com.twentytwentytwenty/logs/$(date +%Y-%m-%d).jsonl | jq -r '.eventType' | sort | uniq -c
+   ```
+   Should see: `work_started`, `break_started`, `work_completed`, `break_completed` events
+
+2. **Check sessions Table** (is data written to database):
+   ```bash
+   sqlite3 ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db \
+     "SELECT COUNT(*) FROM sessions WHERE date(start_time, 'unixepoch') = date('now');"
+   ```
+   Should return today's session count (> 0)
+
+3. **Check Table Schema** (confirm field names are correct):
+   ```bash
+   sqlite3 ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db \
+     "PRAGMA table_info(sessions);"
+   ```
+   Confirm existence of fields: `postpones` (JSON), `break_info` (JSON), `actual_work_duration`
+
+**Key Points**:
+- New version uses JSON fields (`postpones`, `break_info`), not separate `postpone_1min` columns
+- StatsDatabase query methods MUST parse JSON instead of direct column queries
+- `type` field only has value `'work'`, break info is in JSON
+
+### 🐛 Quick Troubleshooting
+
+**Symptom: Countdown inaccurate or version confusion**
+- **Solution**: `make install` to reinstall latest version
+
+**Symptom: Postpone functionality abnormal**
+- **Check**: Postpone logic should NOT modify `currentWorkDuration`
+
+📖 **Complete Troubleshooting**: See [docs/architecture.md](docs/architecture.md#101-common-issues)
+- Detailed symptom analysis and solutions
+- Log viewing methods and database check commands
+- Performance monitoring metrics
+
+## 📱 App Store Readiness
+
+- ✅ **Bundle ID**: `com.example.twentytwentytwenty`
+- ✅ **App Name**: "20-20-20"
+- ✅ **Version**: 1.2.0
+- ✅ **Minimum macOS**: 12.0
+- ✅ **Code Signing**: Configured
+- ✅ **Size**: ~952KB (extremely lightweight)
+
+The app is ready for App Store submission or direct distribution.

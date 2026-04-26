@@ -7,8 +7,18 @@
     "email": "javen.out@gmail.com",
     "github": "@javenfang"
   },
-  "current_version": "1.1.0",
+  "current_version": "1.2.0",
   "versions": [
+    {
+      "version": "1.2.0",
+      "date": "2026-04-26",
+      "changes": [
+        "Changed the default cumulative postpone limit to 5 minutes",
+        "Added a custom-mode postpone limit selector with 5-minute and 10-minute options",
+        "Improved statistics queries for the current JSON-backed session model",
+        "Fixed build metadata and SwiftPM resource configuration"
+      ]
+    },
     {
       "version": "1.1.0",
       "date": "2025-01-15",

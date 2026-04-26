@@ -174,10 +174,12 @@ class StatsDatabase {
             return false
         }
 
+        var hasSessionsTable = false
         var hasPostponesField = false
         var hasBreakInfoField = false
 
         while sqlite3_step(stmt) == SQLITE_ROW {
+            hasSessionsTable = true
             if let namePtr = sqlite3_column_text(stmt, 1) {
                 let columnName = String(cString: namePtr)
                 if columnName == "postpones" {
@@ -192,7 +194,7 @@ class StatsDatabase {
         sqlite3_finalize(stmt)
 
         // Need migration if table exists but doesn't have new fields
-        return !hasPostponesField || !hasBreakInfoField
+        return hasSessionsTable && (!hasPostponesField || !hasBreakInfoField)
     }
 
     private func performMigration() {
@@ -305,31 +307,27 @@ class StatsDatabase {
     }
 
     private func createTables() throws {
+        if needsMigration() {
+            performMigration()
+        }
+
         let createSessionsTable = """
             CREATE TABLE IF NOT EXISTS sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type TEXT CHECK(type IN ('work', 'break')) NOT NULL,
+                type TEXT CHECK(type IN ('work')) NOT NULL,
                 start_time REAL NOT NULL,
                 end_time REAL,
-                planned_duration INTEGER NOT NULL,
-                actual_duration INTEGER,
-                postpone_count INTEGER DEFAULT 0,
-                postpone_1min INTEGER DEFAULT 0,
-                postpone_2min INTEGER DEFAULT 0,
-                postpone_5min INTEGER DEFAULT 0,
-                total_postpone_duration INTEGER DEFAULT 0,
                 status TEXT CHECK(status IN ('active', 'completed', 'interrupted')) DEFAULT 'active',
-                created_at REAL DEFAULT (julianday('now'))
-            )
-        """
 
-        let createPostponeEventsTable = """
-            CREATE TABLE IF NOT EXISTS postpone_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
-                postpone_time REAL NOT NULL,
-                postpone_minutes INTEGER NOT NULL,
-                created_at REAL DEFAULT (julianday('now'))
+                planned_duration INTEGER DEFAULT 1800,
+                actual_work_duration INTEGER,
+                postpone_count INTEGER DEFAULT 0,
+                postpone_total_duration INTEGER DEFAULT 0,
+                postpones TEXT,
+                break_info TEXT,
+                break_completed INTEGER DEFAULT 0,
+
+                created_at REAL DEFAULT (strftime('%s', 'now'))
             )
         """
 
@@ -345,8 +343,8 @@ class StatsDatabase {
                 total_work_minutes INTEGER DEFAULT 0,
                 total_break_minutes INTEGER DEFAULT 0,
                 longest_work_minutes INTEGER DEFAULT 0,
-                avg_postpones_per_session REAL DEFAULT 0,
-                updated_at REAL DEFAULT (julianday('now'))
+                longest_break_minutes INTEGER DEFAULT 0,
+                updated_at REAL DEFAULT (strftime('%s', 'now'))
             )
         """
 
@@ -355,13 +353,11 @@ class StatsDatabase {
             "CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date(start_time, 'unixepoch'))",
             "CREATE INDEX IF NOT EXISTS idx_sessions_type ON sessions(type)",
             "CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)",
-            "CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time)",
-            "CREATE INDEX IF NOT EXISTS idx_postpone_session ON postpone_events(session_id)"
+            "CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time)"
         ]
 
         try dbQueue.sync {
             try executeSQL(createSessionsTable)
-            try executeSQL(createPostponeEventsTable)
             try executeSQL(createDailySummaryTable)
 
             for index in indices {
@@ -371,7 +367,7 @@ class StatsDatabase {
     }
 
     private func executeSQL(_ sql: String) throws {
-        guard isValid else { throw DatabaseError.invalidState }
+        guard db != nil else { throw DatabaseError.invalidState }
 
         if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
             let errorMessage = String(cString: sqlite3_errmsg(db))
@@ -397,7 +393,7 @@ class StatsDatabase {
 
     // MARK: - Core Session Management
 
-    func startWorkSession(plannedDuration: Int, completion: @escaping (Result<Int64, Error>) -> Void) {
+    func startWorkSession(plannedDuration: Int, startTime: Date? = nil, completion: @escaping (Result<Int64, Error>) -> Void) {
         dbQueue.async { [weak self] in
             guard let self = self, self.isValid else {
                 completion(.failure(DatabaseError.invalidState))
@@ -421,8 +417,8 @@ class StatsDatabase {
                         throw DatabaseError.queryFailed("Failed to prepare work session insert")
                     }
 
-                    let now = Date().timeIntervalSince1970
-                    sqlite3_bind_double(statement, 1, now)
+                    let sessionStartTime = startTime?.timeIntervalSince1970 ?? Date().timeIntervalSince1970
+                    sqlite3_bind_double(statement, 1, sessionStartTime)
                     sqlite3_bind_int(statement, 2, Int32(plannedDuration))
 
                     guard sqlite3_step(statement) == SQLITE_DONE else {
@@ -440,15 +436,16 @@ class StatsDatabase {
         }
     }
 
-    func startWorkSession(plannedDuration: Int) -> Int64? {
+    func startWorkSession(plannedDuration: Int, startTime: Date? = nil) -> Int64? {
         var result: Int64?
         let semaphore = DispatchSemaphore(value: 0)
 
-        startWorkSession(plannedDuration: plannedDuration) { res in
+        startWorkSession(plannedDuration: plannedDuration, startTime: startTime) { res in
             switch res {
             case .success(let id):
                 result = id
-                print("✅ Database: Work session created with id \(id)")
+                let timeDesc = startTime != nil ? "at \(startTime!)" : "now"
+                print("✅ Database: Work session created with id \(id) starting \(timeDesc)")
             case .failure(let error):
                 print("❌ Database: Failed to create work session - \(error)")
             }
@@ -466,17 +463,21 @@ class StatsDatabase {
 
             do {
                 try self.withTransaction {
-                    // Get active work session
-                    guard let sessionId = try self.getActiveWorkSessionIdInternal() else {
-                        print("⚠️ No active work session to start break")
+                    // Attach the break to the latest work session. Manual breaks may have already
+                    // completed the work session before the overlay is shown.
+                    guard let sessionId = try self.getLatestWorkSessionForBreakInternal() else {
+                        print("⚠️ No work session available to start break")
                         return
                     }
+
+                    let now = Date().timeIntervalSince1970
+                    try self.endSessionInternal(sessionId: sessionId, at: now)
 
                     // Create break_info JSON
                     let breakInfo = BreakInfo(
                         planned_duration: plannedDuration,
                         actual_duration: nil,
-                        start_time: Date().timeIntervalSince1970,
+                        start_time: now,
                         end_time: nil,
                         status: "active"
                     )
@@ -522,11 +523,27 @@ class StatsDatabase {
 
             do {
                 try self.withTransaction {
-                    // Get active work session
-                    guard let sessionId = try self.getActiveWorkSessionIdInternal() else {
-                        print("⚠️ No active work session to complete break")
+                    // Find session with incomplete break (not necessarily active)
+                    let findSQL = """
+                        SELECT id FROM sessions
+                        WHERE break_info IS NOT NULL
+                          AND break_completed = 0
+                          AND type = 'work'
+                        ORDER BY start_time DESC
+                        LIMIT 1
+                    """
+
+                    var findStmt: OpaquePointer?
+                    defer { sqlite3_finalize(findStmt) }
+
+                    guard sqlite3_prepare_v2(self.db, findSQL, -1, &findStmt, nil) == SQLITE_OK,
+                          sqlite3_step(findStmt) == SQLITE_ROW else {
+                        print("⚠️ No session with incomplete break found")
                         return
                     }
+
+                    let sessionId = sqlite3_column_int64(findStmt, 0)
+                    print("📊 Found session #\(sessionId) with incomplete break")
 
                     // Read current break_info
                     let selectSQL = "SELECT break_info FROM sessions WHERE id = ?"
@@ -560,13 +577,11 @@ class StatsDatabase {
 
                     let breakInfoJSON = self.serializeBreakInfo(breakInfo)
 
-                    // Update session
+                    // Update session - only update break fields, don't modify work session status/end_time
                     let updateSQL = """
                         UPDATE sessions
                         SET break_info = ?,
-                            break_completed = 1,
-                            status = 'completed',
-                            end_time = ?
+                            break_completed = 1
                         WHERE id = ?
                     """
 
@@ -582,8 +597,7 @@ class StatsDatabase {
                     } else {
                         sqlite3_bind_null(statement, 1)
                     }
-                    sqlite3_bind_double(statement, 2, now)
-                    sqlite3_bind_int64(statement, 3, sessionId)
+                    sqlite3_bind_int64(statement, 2, sessionId)
 
                     guard sqlite3_step(statement) == SQLITE_DONE else {
                         throw DatabaseError.queryFailed("Failed to complete break")
@@ -712,6 +726,35 @@ class StatsDatabase {
         }
     }
 
+    private func endSessionInternal(sessionId: Int64, at endTime: TimeInterval) throws {
+        let sql = """
+            UPDATE sessions
+            SET end_time = ?,
+                actual_work_duration = CAST((? - start_time) AS INTEGER),
+                status = 'completed'
+            WHERE id = ? AND status = 'active'
+        """
+
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed("Failed to prepare session end update")
+        }
+
+        sqlite3_bind_double(statement, 1, endTime)
+        sqlite3_bind_double(statement, 2, endTime)
+        sqlite3_bind_int64(statement, 3, sessionId)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.queryFailed("Failed to end session")
+        }
+
+        if sqlite3_changes(db) > 0 {
+            print("📊 Ended work session #\(sessionId) before break")
+        }
+    }
+
     private func getActiveWorkSessionIdInternal() throws -> Int64? {
         let sql = """
             SELECT id FROM sessions
@@ -725,6 +768,30 @@ class StatsDatabase {
 
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
             throw DatabaseError.queryFailed("Failed to prepare active session query")
+        }
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return nil
+        }
+
+        return sqlite3_column_int64(statement, 0)
+    }
+
+    private func getLatestWorkSessionForBreakInternal() throws -> Int64? {
+        let sql = """
+            SELECT id FROM sessions
+            WHERE type = 'work'
+              AND break_info IS NULL
+              AND status IN ('active', 'completed')
+            ORDER BY start_time DESC
+            LIMIT 1
+        """
+
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed("Failed to prepare break session query")
         }
 
         guard sqlite3_step(statement) == SQLITE_ROW else {
@@ -750,29 +817,33 @@ class StatsDatabase {
             }
             print("✅ Database: getTodayStats - starting query")
 
+            // Step 1: Get all today's sessions with JSON fields for detailed parsing.
+            // Filter out sessions < 60 seconds (app restart artifacts), while still
+            // counting the current active session once it has lasted at least a minute.
             let sql = """
-                SELECT
-                    COUNT(CASE WHEN type = 'work' THEN 1 END) as work_sessions,
-                    COUNT(CASE WHEN type = 'break' THEN 1 END) as break_sessions,
-                    COALESCE(SUM(postpone_count), 0) as total_postpones,
-                    COALESCE(SUM(postpone_1min), 0) as postpone_1min,
-                    COALESCE(SUM(postpone_2min), 0) as postpone_2min,
-                    COALESCE(SUM(postpone_5min), 0) as postpone_5min,
-                    COALESCE(SUM(CASE WHEN type = 'work' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as total_work_minutes,
-                    COALESCE(SUM(CASE WHEN type = 'break' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as total_break_minutes,
-                    COALESCE(MAX(CASE WHEN type = 'work' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as longest_work_minutes,
-                    COALESCE(AVG(CASE WHEN type = 'work' THEN postpone_count END), 0) as avg_postpones
-                FROM sessions
-                WHERE date(start_time, 'unixepoch') = date('now')
+                SELECT id,
+                       postpones,
+                       break_info,
+                       effective_work_duration,
+                       postpone_count,
+                       break_completed
+                FROM (
+                    SELECT id,
+                           postpones,
+                           break_info,
+                           CASE
+                               WHEN status = 'active' THEN CAST((strftime('%s', 'now') - start_time) AS INTEGER)
+                               WHEN actual_work_duration IS NOT NULL THEN actual_work_duration
+                               WHEN end_time IS NOT NULL THEN CAST((end_time - start_time) AS INTEGER)
+                               ELSE 0
+                           END AS effective_work_duration,
+                           postpone_count,
+                           break_completed
+                    FROM sessions
+                    WHERE date(start_time, 'unixepoch', 'localtime') = date('now', 'localtime')
+                      AND type = 'work'
+                )
+                WHERE effective_work_duration >= 60
             """
 
             var statement: OpaquePointer?
@@ -783,43 +854,82 @@ class StatsDatabase {
                 return
             }
 
-            let stepResult = sqlite3_step(statement)
-            print("📊 Database: getTodayStats step result = \(stepResult) (SQLITE_ROW=\(SQLITE_ROW))")
+            // Accumulators for statistics
+            var workSessions = 0
+            var breakSessions = 0
+            var totalPostpones = 0
+            var postpone1MinCount = 0
+            var postpone2MinCount = 0
+            var postpone5MinCount = 0
+            var totalWorkMinutes = 0
+            var totalBreakMinutes = 0
+            var longestWorkMinutes = 0
 
-            guard stepResult == SQLITE_ROW else {
-                // For aggregate queries, even with no data, we should return zero stats
-                print("⚠️ Database: No row returned, creating empty stats")
-                let emptyStats = DailyStats(
-                    date: Date(),
-                    workSessions: 0,
-                    breakSessions: 0,
-                    totalPostpones: 0,
-                    postpone1MinCount: 0,
-                    postpone2MinCount: 0,
-                    postpone5MinCount: 0,
-                    totalWorkMinutes: 0,
-                    totalBreakMinutes: 0,
-                    longestWorkMinutes: 0,
-                    avgPostponesPerSession: 0
-                )
-                completion(.success(emptyStats))
-                return
+            while sqlite3_step(statement) == SQLITE_ROW {
+                workSessions += 1
+
+                // Parse postpones JSON
+                if let jsonPtr = sqlite3_column_text(statement, 1) {
+                    let jsonString = String(cString: jsonPtr)
+                    let postpones = self.parsePostpones(jsonString)
+                    totalPostpones += postpones.count
+
+                    for postpone in postpones {
+                        let minutes = postpone.duration / 60
+                        if minutes == 1 {
+                            postpone1MinCount += 1
+                        } else if minutes == 2 {
+                            postpone2MinCount += 1
+                        } else if minutes == 5 {
+                            postpone5MinCount += 1
+                        }
+                    }
+                }
+
+                // Parse break_info JSON
+                if let jsonPtr = sqlite3_column_text(statement, 2) {
+                    let jsonString = String(cString: jsonPtr)
+                    if let breakInfo = self.parseBreakInfo(jsonString) {
+                        if let actualDuration = breakInfo.actual_duration {
+                            totalBreakMinutes += actualDuration / 60
+                        }
+                    }
+                }
+
+                // Check if break was completed
+                let breakCompleted = sqlite3_column_int(statement, 5)
+                if breakCompleted == 1 {
+                    breakSessions += 1
+                }
+
+                // Work duration
+                let workDuration = Int(sqlite3_column_int(statement, 3))
+                if workDuration > 0 {
+                    let workMinutes = workDuration / 60
+                    totalWorkMinutes += workMinutes
+                    if workMinutes > longestWorkMinutes {
+                        longestWorkMinutes = workMinutes
+                    }
+                }
             }
+
+            let avgPostpones = workSessions > 0 ? Double(totalPostpones) / Double(workSessions) : 0.0
 
             let stats = DailyStats(
                 date: Date(),
-                workSessions: Int(sqlite3_column_int(statement, 0)),
-                breakSessions: Int(sqlite3_column_int(statement, 1)),
-                totalPostpones: Int(sqlite3_column_int(statement, 2)),
-                postpone1MinCount: Int(sqlite3_column_int(statement, 3)),
-                postpone2MinCount: Int(sqlite3_column_int(statement, 4)),
-                postpone5MinCount: Int(sqlite3_column_int(statement, 5)),
-                totalWorkMinutes: Int(sqlite3_column_int(statement, 6)),
-                totalBreakMinutes: Int(sqlite3_column_int(statement, 7)),
-                longestWorkMinutes: Int(sqlite3_column_int(statement, 8)),
-                avgPostponesPerSession: sqlite3_column_double(statement, 9)
+                workSessions: workSessions,
+                breakSessions: breakSessions,
+                totalPostpones: totalPostpones,
+                postpone1MinCount: postpone1MinCount,
+                postpone2MinCount: postpone2MinCount,
+                postpone5MinCount: postpone5MinCount,
+                totalWorkMinutes: totalWorkMinutes,
+                totalBreakMinutes: totalBreakMinutes,
+                longestWorkMinutes: longestWorkMinutes,
+                avgPostponesPerSession: avgPostpones
             )
 
+            print("📊 Database: getTodayStats success - work:\(stats.workSessions) breaks:\(stats.breakSessions) postpones:\(stats.totalPostpones)")
             completion(.success(stats))
         }
     }
@@ -851,33 +961,34 @@ class StatsDatabase {
                 return
             }
 
-            var results: [(Date, DailyStats)] = []
-
+            // Get sessions from last 7 days.
+            // Filter out sessions < 60 seconds (app restart artifacts), while still
+            // counting active sessions once they have lasted at least a minute.
+            let sevenDaysAgo = Date().timeIntervalSince1970 - (7 * 24 * 3600)
             let sql = """
-                SELECT
-                    date(start_time, 'unixepoch') as day,
-                    COUNT(CASE WHEN type = 'work' THEN 1 END) as work_sessions,
-                    COUNT(CASE WHEN type = 'break' THEN 1 END) as break_sessions,
-                    COALESCE(SUM(postpone_count), 0) as total_postpones,
-                    COALESCE(SUM(postpone_1min), 0) as postpone_1min,
-                    COALESCE(SUM(postpone_2min), 0) as postpone_2min,
-                    COALESCE(SUM(postpone_5min), 0) as postpone_5min,
-                    COALESCE(SUM(CASE WHEN type = 'work' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as total_work_minutes,
-                    COALESCE(SUM(CASE WHEN type = 'break' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as total_break_minutes,
-                    COALESCE(MAX(CASE WHEN type = 'work' THEN
-                        CASE WHEN status = 'active' THEN strftime('%s', 'now') - start_time
-                             ELSE actual_duration END
-                    END) / 60, 0) as longest_work_minutes,
-                    COALESCE(AVG(CASE WHEN type = 'work' THEN postpone_count END), 0) as avg_postpones
-                FROM sessions
-                WHERE start_time > ?
-                GROUP BY day
+                SELECT date(start_time, 'unixepoch', 'localtime') as day,
+                       id,
+                       postpones,
+                       break_info,
+                       effective_work_duration,
+                       break_completed
+                FROM (
+                    SELECT start_time,
+                           id,
+                           postpones,
+                           break_info,
+                           CASE
+                               WHEN status = 'active' THEN CAST((strftime('%s', 'now') - start_time) AS INTEGER)
+                               WHEN actual_work_duration IS NOT NULL THEN actual_work_duration
+                               WHEN end_time IS NOT NULL THEN CAST((end_time - start_time) AS INTEGER)
+                               ELSE 0
+                           END AS effective_work_duration,
+                           break_completed
+                    FROM sessions
+                    WHERE start_time > ?
+                      AND type = 'work'
+                )
+                WHERE effective_work_duration >= 60
                 ORDER BY day DESC
             """
 
@@ -889,35 +1000,94 @@ class StatsDatabase {
                 return
             }
 
-            // Bind the date parameter (7 days ago)
-            let sevenDaysAgo = Date().timeIntervalSince1970 - (7 * 24 * 3600)
             sqlite3_bind_double(statement, 1, sevenDaysAgo)
 
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            dateFormatter.timeZone = TimeZone.current
+
+            // Group results by day
+            var dailyData: [String: (workSessions: Int, breakSessions: Int, totalPostpones: Int, p1: Int, p2: Int, p5: Int, workMin: Int, breakMin: Int, longestWork: Int)] = [:]
 
             while sqlite3_step(statement) == SQLITE_ROW {
-                if let dateString = sqlite3_column_text(statement, 0),
-                   let date = dateFormatter.date(from: String(cString: dateString)) {
+                guard let dateString = sqlite3_column_text(statement, 0) else { continue }
+                let day = String(cString: dateString)
 
-                    let stats = DailyStats(
-                        date: date,
-                        workSessions: Int(sqlite3_column_int(statement, 1)),
-                        breakSessions: Int(sqlite3_column_int(statement, 2)),
-                        totalPostpones: Int(sqlite3_column_int(statement, 3)),
-                        postpone1MinCount: Int(sqlite3_column_int(statement, 4)),
-                        postpone2MinCount: Int(sqlite3_column_int(statement, 5)),
-                        postpone5MinCount: Int(sqlite3_column_int(statement, 6)),
-                        totalWorkMinutes: Int(sqlite3_column_int(statement, 7)),
-                        totalBreakMinutes: Int(sqlite3_column_int(statement, 8)),
-                        longestWorkMinutes: Int(sqlite3_column_int(statement, 9)),
-                        avgPostponesPerSession: sqlite3_column_double(statement, 10)
-                    )
-
-                    results.append((date, stats))
+                // Initialize day if not exists
+                if dailyData[day] == nil {
+                    dailyData[day] = (0, 0, 0, 0, 0, 0, 0, 0, 0)
                 }
+
+                var data = dailyData[day]!
+                data.workSessions += 1
+
+                // Parse postpones JSON
+                if let jsonPtr = sqlite3_column_text(statement, 2) {
+                    let jsonString = String(cString: jsonPtr)
+                    let postpones = self.parsePostpones(jsonString)
+                    data.totalPostpones += postpones.count
+
+                    for postpone in postpones {
+                        let minutes = postpone.duration / 60
+                        if minutes == 1 { data.p1 += 1 }
+                        else if minutes == 2 { data.p2 += 1 }
+                        else if minutes == 5 { data.p5 += 1 }
+                    }
+                }
+
+                // Parse break_info JSON
+                if let jsonPtr = sqlite3_column_text(statement, 3) {
+                    let jsonString = String(cString: jsonPtr)
+                    if let breakInfo = self.parseBreakInfo(jsonString),
+                       let actualDuration = breakInfo.actual_duration {
+                        data.breakMin += actualDuration / 60
+                    }
+                }
+
+                // Check if break was completed
+                if sqlite3_column_int(statement, 5) == 1 {
+                    data.breakSessions += 1
+                }
+
+                // Work duration
+                let workDuration = Int(sqlite3_column_int(statement, 4))
+                if workDuration > 0 {
+                    let workMinutes = workDuration / 60
+                    data.workMin += workMinutes
+                    if workMinutes > data.longestWork {
+                        data.longestWork = workMinutes
+                    }
+                }
+
+                dailyData[day] = data
             }
+
+            // Convert to result format
+            var results: [(Date, DailyStats)] = []
+            for (dayString, data) in dailyData {
+                guard let date = dateFormatter.date(from: dayString) else { continue }
+
+                let avgPostpones = data.workSessions > 0 ? Double(data.totalPostpones) / Double(data.workSessions) : 0.0
+
+                let stats = DailyStats(
+                    date: date,
+                    workSessions: data.workSessions,
+                    breakSessions: data.breakSessions,
+                    totalPostpones: data.totalPostpones,
+                    postpone1MinCount: data.p1,
+                    postpone2MinCount: data.p2,
+                    postpone5MinCount: data.p5,
+                    totalWorkMinutes: data.workMin,
+                    totalBreakMinutes: data.breakMin,
+                    longestWorkMinutes: data.longestWork,
+                    avgPostponesPerSession: avgPostpones
+                )
+
+                results.append((date, stats))
+            }
+
+            // Sort by date descending
+            results.sort { $0.0 > $1.0 }
 
             completion(.success(results))
         }
@@ -945,33 +1115,36 @@ class StatsDatabase {
         dbQueue.async { [weak self] in
             guard let self = self, self.isValid else { return }
 
+            // Note: This method is deprecated since stats are now computed on-demand from sessions table
+            // Kept for compatibility but uses simplified aggregation without JSON parsing
             let sql = """
                 INSERT OR REPLACE INTO daily_summary (
                     date, work_sessions, break_sessions, total_postpones,
                     postpone_1min_count, postpone_2min_count, postpone_5min_count,
                     total_work_minutes, total_break_minutes, longest_work_minutes,
-                    avg_postpones_per_session, updated_at
+                    updated_at
                 )
                 SELECT
-                    date(start_time, 'unixepoch') as day,
-                    COUNT(CASE WHEN type = 'work' THEN 1 END),
-                    COUNT(CASE WHEN type = 'break' THEN 1 END),
+                    date(start_time, 'unixepoch', 'localtime') as day,
+                    COUNT(*),
+                    COALESCE(SUM(break_completed), 0),
                     COALESCE(SUM(postpone_count), 0),
-                    COALESCE(SUM(postpone_1min), 0),
-                    COALESCE(SUM(postpone_2min), 0),
-                    COALESCE(SUM(postpone_5min), 0),
-                    COALESCE(SUM(CASE WHEN type = 'work' THEN actual_duration END) / 60, 0),
-                    COALESCE(SUM(CASE WHEN type = 'break' THEN actual_duration END) / 60, 0),
-                    COALESCE(MAX(CASE WHEN type = 'work' THEN actual_duration END) / 60, 0),
-                    COALESCE(AVG(CASE WHEN type = 'work' THEN postpone_count END), 0),
-                    julianday('now')
+                    0,
+                    0,
+                    0,
+                    COALESCE(SUM(actual_work_duration) / 60, 0),
+                    0,
+                    COALESCE(MAX(actual_work_duration) / 60, 0),
+                    strftime('%s', 'now')
                 FROM sessions
-                WHERE date(start_time, 'unixepoch') = date('now')
+                WHERE date(start_time, 'unixepoch', 'localtime') = date('now', 'localtime')
+                AND type = 'work'
                 GROUP BY day
             """
 
             do {
                 try self.executeSQL(sql)
+                print("📊 Daily summary updated (simplified, use getTodayStats for accurate data)")
             } catch {
                 print("❌ Failed to update daily summary: \(error)")
             }
