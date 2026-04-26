@@ -7,8 +7,19 @@
     "email": "javen.out@gmail.com",
     "github": "@javenfang"
   },
-  "current_version": "1.2.0",
+  "current_version": "1.2.1",
   "versions": [
+    {
+      "version": "1.2.1",
+      "date": "2026-04-26",
+      "changes": [
+        "Rebuilt the eye health report with a scrollable dashboard layout",
+        "Added a tested statistics engine for daily and seven-day health metrics",
+        "Excluded short restart fragments and stale long sessions from health totals",
+        "Separated break completion rate, postponed sessions, and total postpone actions",
+        "Added data quality warnings for incomplete break and postpone records"
+      ]
+    },
     {
       "version": "1.2.0",
       "date": "2026-04-26",

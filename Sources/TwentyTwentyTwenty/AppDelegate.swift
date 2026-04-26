@@ -22,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var timerMenuItem: NSMenuItem!
     private var breakOverlays: [BreakOverlayWindow] = []
     private var loginItemMenuItem: NSMenuItem!
-    private var healthStatsWindow: SimpleStatsWindow?
+    private var healthStatsWindow: StatsDashboardWindow?
     
     // 事件记录器（新的统一系统）
     private let eventRecorder = EventRecorder.shared
@@ -785,28 +785,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // 创建新的统计窗口
-        let statsWindow = SimpleStatsWindow()
+        let statsWindow = StatsDashboardWindow()
         statsWindow.setLocalizer(localized)
         healthStatsWindow = statsWindow
         
         // 设置窗口代理以在关闭时清理引用
         statsWindow.delegate = self
         
-        // 使用系统的居中方法
-        statsWindow.center()
-        print("📐 统计窗口已居中")
-        
         // 显示窗口
         statsWindow.makeKeyAndOrderFront(nil)
-        
-        // 强制设置到主屏幕
-        if let mainScreen = NSScreen.main {
-            let screenFrame = mainScreen.visibleFrame
-            let x = screenFrame.minX + (screenFrame.width - 380) / 2
-            let y = screenFrame.minY + (screenFrame.height - 420) / 2
-            statsWindow.setFrame(NSRect(x: x, y: y, width: 380, height: 420), display: true)
-        }
-        
+
         // 确保窗口获得焦点
         NSApp.activate(ignoringOtherApps: true)
         
@@ -1680,7 +1668,7 @@ extension AppDelegate: BreakOverlayDelegate {
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         // 如果关闭的是统计窗口，清理引用
-        if let window = notification.object as? SimpleStatsWindow, window == healthStatsWindow {
+        if let window = notification.object as? StatsDashboardWindow, window == healthStatsWindow {
             healthStatsWindow = nil
             print("📊 统计窗口引用已清理")
         }

@@ -7,18 +7,30 @@ let package = Package(
         .macOS(.v12)
     ],
     products: [
+        .library(
+            name: "TwentyTwentyTwentyCore",
+            targets: ["TwentyTwentyTwentyCore"]
+        ),
         .executable(
             name: "TwentyTwentyTwenty",
             targets: ["TwentyTwentyTwenty"]
         ),
     ],
     targets: [
+        .target(
+            name: "TwentyTwentyTwentyCore",
+            dependencies: []
+        ),
         .executableTarget(
             name: "TwentyTwentyTwenty",
-            dependencies: [],
+            dependencies: ["TwentyTwentyTwentyCore"],
             resources: [
                 .copy("Resources")
             ]
+        ),
+        .testTarget(
+            name: "TwentyTwentyTwentyCoreTests",
+            dependencies: ["TwentyTwentyTwentyCore"]
         ),
     ]
 )

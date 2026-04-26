@@ -1,6 +1,7 @@
 import Foundation
 import SQLite3
 import AppKit
+import TwentyTwentyTwentyCore
 
 // MARK: - Data Models
 
@@ -1107,6 +1108,143 @@ class StatsDatabase {
 
         semaphore.wait()
         return result
+    }
+
+    func getDashboardSnapshot(now: Date = Date(), completion: @escaping (Result<StatsDashboardSnapshot, Error>) -> Void) {
+        dbQueue.async { [weak self] in
+            guard let self = self, self.isValid else {
+                completion(.failure(DatabaseError.invalidState))
+                return
+            }
+
+            do {
+                let calendar = Calendar.current
+                let todayStart = calendar.startOfDay(for: now)
+                let startDate = calendar.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+                let records = try self.getSessionRecordsSince(startDate)
+                let engine = StatsEngine(calendar: calendar, now: now)
+                completion(.success(engine.dashboard(from: records)))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func getDashboardSnapshot(now: Date = Date()) -> StatsDashboardSnapshot? {
+        var result: StatsDashboardSnapshot?
+        let semaphore = DispatchSemaphore(value: 0)
+
+        getDashboardSnapshot(now: now) { response in
+            if case .success(let snapshot) = response {
+                result = snapshot
+            } else if case .failure(let error) = response {
+                print("❌ Database: getDashboardSnapshot failed - \(error)")
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+        return result
+    }
+
+    private func getSessionRecordsSince(_ startDate: Date) throws -> [StatsSessionRecord] {
+        let sql = """
+            SELECT id,
+                   start_time,
+                   end_time,
+                   planned_duration,
+                   actual_work_duration,
+                   postpone_count,
+                   postpone_total_duration,
+                   postpones,
+                   break_info,
+                   break_completed,
+                   status
+            FROM sessions
+            WHERE start_time >= ?
+              AND type = 'work'
+            ORDER BY start_time ASC
+        """
+
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed("Failed to prepare dashboard stats query")
+        }
+
+        sqlite3_bind_double(statement, 1, startDate.timeIntervalSince1970)
+
+        var records: [StatsSessionRecord] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let id = sqlite3_column_int64(statement, 0)
+            let startTime = Date(timeIntervalSince1970: sqlite3_column_double(statement, 1))
+            let endTime = optionalDate(statement, column: 2)
+            let plannedDuration = Int(sqlite3_column_int(statement, 3))
+            let actualWorkDuration = optionalInt(statement, column: 4)
+            let postponeCount = Int(sqlite3_column_int(statement, 5))
+            let postponeTotalDuration = Int(sqlite3_column_int(statement, 6))
+            let postpones = parsePostpones(optionalString(statement, column: 7)).map { record in
+                StatsPostponeRecord(
+                    durationSeconds: record.duration,
+                    startTime: Date(timeIntervalSince1970: record.start_time),
+                    endTime: record.end_time.map { Date(timeIntervalSince1970: $0) },
+                    status: StatsRecordStatus(rawValue: record.status) ?? .unknown
+                )
+            }
+            let breakRecord = parseBreakInfo(optionalString(statement, column: 8)).map { record in
+                StatsBreakRecord(
+                    plannedDurationSeconds: record.planned_duration,
+                    actualDurationSeconds: record.actual_duration,
+                    startTime: Date(timeIntervalSince1970: record.start_time),
+                    endTime: record.end_time.map { Date(timeIntervalSince1970: $0) },
+                    status: StatsRecordStatus(rawValue: record.status) ?? .unknown
+                )
+            }
+            let breakCompleted = sqlite3_column_int(statement, 9) == 1
+            let statusString = optionalString(statement, column: 10) ?? "unknown"
+
+            records.append(
+                StatsSessionRecord(
+                    id: id,
+                    startTime: startTime,
+                    endTime: endTime,
+                    plannedDurationSeconds: plannedDuration,
+                    actualWorkDurationSeconds: actualWorkDuration,
+                    recordedPostponeCount: postponeCount,
+                    postponeTotalDurationSeconds: postponeTotalDuration,
+                    postpones: postpones,
+                    breakRecord: breakRecord,
+                    breakCompleted: breakCompleted,
+                    status: StatsSessionStatus(rawValue: statusString) ?? .unknown
+                )
+            )
+        }
+
+        return records
+    }
+
+    private func optionalString(_ statement: OpaquePointer?, column: Int32) -> String? {
+        guard sqlite3_column_type(statement, column) != SQLITE_NULL,
+              let text = sqlite3_column_text(statement, column) else {
+            return nil
+        }
+        return String(cString: text)
+    }
+
+    private func optionalInt(_ statement: OpaquePointer?, column: Int32) -> Int? {
+        guard sqlite3_column_type(statement, column) != SQLITE_NULL else {
+            return nil
+        }
+        return Int(sqlite3_column_int(statement, column))
+    }
+
+    private func optionalDate(_ statement: OpaquePointer?, column: Int32) -> Date? {
+        guard sqlite3_column_type(statement, column) != SQLITE_NULL else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: sqlite3_column_double(statement, column))
     }
 
     // MARK: - Maintenance
