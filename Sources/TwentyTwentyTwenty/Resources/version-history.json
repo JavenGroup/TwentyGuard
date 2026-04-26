@@ -7,8 +7,18 @@
     "email": "javen.out@gmail.com",
     "github": "@javenfang"
   },
-  "current_version": "1.2.1",
+  "current_version": "1.2.2",
   "versions": [
+    {
+      "version": "1.2.2",
+      "date": "2026-04-27",
+      "changes": [
+        "Removed the manual refresh button from the eye health report",
+        "Refresh statistics automatically whenever the report is opened",
+        "Close the health report when a break starts so it does not reappear after the break",
+        "Aligned the seven-day daily rows with fixed-width columns"
+      ]
+    },
     {
       "version": "1.2.1",
       "date": "2026-04-26",

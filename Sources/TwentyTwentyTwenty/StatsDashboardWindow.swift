@@ -9,7 +9,6 @@ final class StatsDashboardWindow: NSWindow {
     private let documentView = FlippedDocumentView()
     private let footerView = NSView()
     private let closeButton = NSButton()
-    private let refreshButton = NSButton()
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(
@@ -33,6 +32,10 @@ final class StatsDashboardWindow: NSWindow {
         self.localizer = localizer
         title = localizer("eye_health_report")
         closeButton.title = localizer("close")
+    }
+
+    func reloadData() {
+        loadSnapshot()
     }
 
     private func setupWindow() {
@@ -72,12 +75,6 @@ final class StatsDashboardWindow: NSWindow {
         closeButton.target = self
         closeButton.action = #selector(closeWindow)
 
-        refreshButton.translatesAutoresizingMaskIntoConstraints = false
-        refreshButton.title = "刷新"
-        refreshButton.bezelStyle = .rounded
-        refreshButton.target = self
-        refreshButton.action = #selector(refreshSnapshot)
-
         let separator = NSBox()
         separator.translatesAutoresizingMaskIntoConstraints = false
         separator.boxType = .separator
@@ -85,7 +82,6 @@ final class StatsDashboardWindow: NSWindow {
         rootView.addSubview(scrollView)
         rootView.addSubview(footerView)
         footerView.addSubview(separator)
-        footerView.addSubview(refreshButton)
         footerView.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
@@ -102,9 +98,6 @@ final class StatsDashboardWindow: NSWindow {
             separator.leadingAnchor.constraint(equalTo: footerView.leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: footerView.trailingAnchor),
             separator.topAnchor.constraint(equalTo: footerView.topAnchor),
-
-            refreshButton.centerYAnchor.constraint(equalTo: footerView.centerYAnchor),
-            refreshButton.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -10),
 
             closeButton.centerYAnchor.constraint(equalTo: footerView.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: footerView.trailingAnchor, constant: -22),
@@ -312,13 +305,17 @@ final class StatsDashboardWindow: NSWindow {
         row.alignment = .centerY
 
         let dateLabel = makeLabel(formatShortDate(day.date), size: 12, weight: .medium)
-        dateLabel.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        dateLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        dateLabel.widthAnchor.constraint(equalToConstant: 72).isActive = true
 
         let workLabel = makeLabel(formatDuration(day.totalWorkSeconds), size: 12, color: .secondaryLabelColor)
-        workLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        workLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        workLabel.widthAnchor.constraint(equalToConstant: 156).isActive = true
 
         let completionLabel = makeBadge(formatPercent(day.breakCompletionRate), color: completionColor(day.breakCompletionRate))
-        completionLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 54).isActive = true
+        completionLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        completionLabel.alignment = .right
+        completionLabel.widthAnchor.constraint(equalToConstant: 64).isActive = true
 
         row.addArrangedSubview(dateLabel)
         row.addArrangedSubview(workLabel)
@@ -504,10 +501,6 @@ final class StatsDashboardWindow: NSWindow {
         }
 
         return messages
-    }
-
-    @objc private func refreshSnapshot() {
-        loadSnapshot()
     }
 
     @objc private func closeWindow() {

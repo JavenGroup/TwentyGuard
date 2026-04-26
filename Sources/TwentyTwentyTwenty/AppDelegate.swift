@@ -776,6 +776,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 如果窗口已经存在，就激活它而不是创建新的
         if let existingWindow = healthStatsWindow {
             if existingWindow.isVisible {
+                existingWindow.reloadData()
                 existingWindow.makeKeyAndOrderFront(nil)
                 return
             } else {
@@ -1359,6 +1360,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func showBreakOverlay() {
         print("🎭 showBreakOverlay 被调用")
+        closeHealthStatsWindowIfNeeded()
 
         // 防止重复创建窗口 - 如果已有窗口，先清理
         if !breakOverlays.isEmpty {
@@ -1500,6 +1502,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let countBefore = breakOverlays.count
         breakOverlays.removeAll()
         print("✅ 窗口清理完成 - 清理前: \(countBefore) 个, 清理后: \(breakOverlays.count) 个")
+    }
+
+    private func closeHealthStatsWindowIfNeeded() {
+        guard let window = healthStatsWindow else { return }
+
+        window.close()
+        healthStatsWindow = nil
+        print("📊 进入休息时关闭统计窗口，避免休息结束后自动露出")
     }
     
     private func postponeBreak(minutes: Int) {
