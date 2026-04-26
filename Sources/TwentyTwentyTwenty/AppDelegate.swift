@@ -666,7 +666,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let workDurationItem = NSMenuItem(title: "    \(localized("screenUsage")): \(currentWorkMinutes) \(localized("minutes"))", action: nil, keyEquivalent: "")
         let workDurationSubmenu = NSMenu()
         
-        let workDurations = [10, 20, 30, 40, 50, 60] // minutes
+        let workDurations = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60] // minutes
         for duration in workDurations {
             let item = NSMenuItem(title: "\(duration) \(localized("minutes"))", action: #selector(selectWorkDuration(_:)), keyEquivalent: "")
             item.target = self

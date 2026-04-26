@@ -7,8 +7,15 @@
     "email": "javen.out@gmail.com",
     "github": "@javenfang"
   },
-  "current_version": "1.2.2",
+  "current_version": "1.2.3",
   "versions": [
+    {
+      "version": "1.2.3",
+      "date": "2026-04-27",
+      "changes": [
+        "Added 15, 25, 35, and 45 minute custom screen usage duration options"
+      ]
+    },
     {
       "version": "1.2.2",
       "date": "2026-04-27",
