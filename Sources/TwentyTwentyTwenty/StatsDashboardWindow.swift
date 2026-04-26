@@ -6,7 +6,7 @@ final class StatsDashboardWindow: NSWindow {
     private var localizer: ((String) -> String)?
     private let contentStack = NSStackView()
     private let scrollView = NSScrollView()
-    private let documentView = NSView()
+    private let documentView = FlippedDocumentView()
     private let footerView = NSView()
     private let closeButton = NSButton()
     private let refreshButton = NSButton()
@@ -58,7 +58,7 @@ final class StatsDashboardWindow: NSWindow {
 
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
-        contentStack.alignment = .width
+        contentStack.alignment = .leading
         contentStack.spacing = 18
         documentView.addSubview(contentStack)
 
@@ -152,28 +152,30 @@ final class StatsDashboardWindow: NSWindow {
         clearContent()
         let label = makeLabel("正在加载统计...", size: 14, color: .secondaryLabelColor)
         label.alignment = .center
-        contentStack.addArrangedSubview(label)
+        addContentSection(label)
     }
 
     private func render(_ snapshot: StatsDashboardSnapshot) {
         clearContent()
-        contentStack.addArrangedSubview(makeHeader(snapshot))
-        contentStack.addArrangedSubview(makeTodayMetrics(snapshot.today))
-        contentStack.addArrangedSubview(makeTodayDetails(snapshot.today))
-        contentStack.addArrangedSubview(makeWeekSection(snapshot.week))
-        contentStack.addArrangedSubview(makeQualitySection(snapshot.week.quality))
+        addContentSection(makeHeader(snapshot))
+        addContentSection(makeTodayMetrics(snapshot.today))
+        addContentSection(makeTodayDetails(snapshot.today))
+        addContentSection(makeWeekSection(snapshot.week))
+        addContentSection(makeQualitySection(snapshot.week.quality))
+        scrollToTop()
     }
 
     private func renderError() {
         clearContent()
-        contentStack.addArrangedSubview(makeHeader(nil))
+        addContentSection(makeHeader(nil))
         let panel = makePanel()
         let stack = makeVerticalStack(spacing: 8, inset: 16)
         panel.addSubview(stack)
         pin(stack, to: panel)
         stack.addArrangedSubview(makeLabel("统计数据暂时无法读取", size: 15, weight: .semibold))
         stack.addArrangedSubview(makeLabel("可以稍后刷新；当前计时功能不受影响。", size: 13, color: .secondaryLabelColor))
-        contentStack.addArrangedSubview(panel)
+        addContentSection(panel)
+        scrollToTop()
     }
 
     private func clearContent() {
@@ -181,6 +183,11 @@ final class StatsDashboardWindow: NSWindow {
             contentStack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+    }
+
+    private func addContentSection(_ view: NSView) {
+        contentStack.addArrangedSubview(view)
+        view.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
     private func makeHeader(_ snapshot: StatsDashboardSnapshot?) -> NSView {
@@ -206,7 +213,6 @@ final class StatsDashboardWindow: NSWindow {
 
     private func makeTodayMetrics(_ today: StatsDaySnapshot) -> NSView {
         let container = makeVerticalStack(spacing: 12, inset: 0)
-        container.alignment = .width
 
         container.addArrangedSubview(makeSectionTitle("今日概览"))
 
@@ -248,7 +254,6 @@ final class StatsDashboardWindow: NSWindow {
     private func makeTodayDetails(_ today: StatsDaySnapshot) -> NSView {
         let panel = makePanel()
         let stack = makeVerticalStack(spacing: 12, inset: 16)
-        stack.alignment = .width
         panel.addSubview(stack)
         pin(stack, to: panel)
 
@@ -264,7 +269,6 @@ final class StatsDashboardWindow: NSWindow {
     private func makeWeekSection(_ week: StatsWeekSnapshot) -> NSView {
         let panel = makePanel()
         let stack = makeVerticalStack(spacing: 12, inset: 16)
-        stack.alignment = .width
         panel.addSubview(stack)
         pin(stack, to: panel)
 
@@ -286,7 +290,6 @@ final class StatsDashboardWindow: NSWindow {
     private func makeQualitySection(_ quality: StatsQualitySummary) -> NSView {
         let panel = makePanel()
         let stack = makeVerticalStack(spacing: 10, inset: 16)
-        stack.alignment = .width
         panel.addSubview(stack)
         pin(stack, to: panel)
 
@@ -420,6 +423,12 @@ final class StatsDashboardWindow: NSWindow {
         ])
     }
 
+    private func scrollToTop() {
+        documentView.layoutSubtreeIfNeeded()
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
     private func formatDuration(_ seconds: Int) -> String {
         guard seconds > 0 else { return "0 分钟" }
         let minutes = max(1, seconds / 60)
@@ -510,6 +519,12 @@ final class StatsDashboardWindow: NSWindow {
     }
 
     override var canBecomeMain: Bool {
+        true
+    }
+}
+
+private final class FlippedDocumentView: NSView {
+    override var isFlipped: Bool {
         true
     }
 }
