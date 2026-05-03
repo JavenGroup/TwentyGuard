@@ -3,6 +3,13 @@ import ServiceManagement
 import TwentyTwentyTwentyCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private enum AppIdentity {
+        static let displayName = "TwentyGuard"
+        static let bundleIdentifier = "com.javengroup.twentyguard"
+        static let legacyBundleIdentifier = "com.example.twentytwentytwenty"
+        static let defaultsMigrationKey = "didMigrateDefaultsFrom2020ToTwentyGuard"
+    }
+
     private var statusBarItem: NSStatusItem!
     private var menu: NSMenu!
     private var workTimer: Timer?
@@ -127,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postponed": "推迟",
             "postpone_status": "已推迟 %d 分钟，剩余可推迟 %d 分钟",
             "appAlreadyRunning": "应用已在运行",
-            "appAlreadyRunningMessage": "20-20-20 已经在运行中，只能同时运行一个实例。",
+            "appAlreadyRunningMessage": "TwentyGuard 已经在运行中，只能同时运行一个实例。",
             "ok": "确定",
             "eyeHealthStats": "👁️ 眼睛健康统计",
             "close": "关闭",
@@ -174,7 +181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postponed": "Postponed",
             "postpone_status": "Postponed %d min, %d min left",
             "appAlreadyRunning": "App Already Running",
-            "appAlreadyRunningMessage": "20-20-20 is already running. Only one instance can run at a time.",
+            "appAlreadyRunningMessage": "TwentyGuard is already running. Only one instance can run at a time.",
             "ok": "OK",
             "eyeHealthStats": "👁️ Eye Health Stats",
             "close": "Close",
@@ -221,7 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "postponed": "Pospuesto",
             "postpone_status": "Pospuesto %d min, quedan %d min",
             "appAlreadyRunning": "Aplicación Ya Ejecutándose",
-            "appAlreadyRunningMessage": "20-20-20 ya está ejecutándose. Solo puede ejecutarse una instancia a la vez.",
+            "appAlreadyRunningMessage": "TwentyGuard ya está ejecutándose. Solo puede ejecutarse una instancia a la vez.",
             "ok": "OK",
             "eyeHealthStats": "👁️ Estadísticas de Salud Ocular",
             "close": "Cerrar",
@@ -298,7 +305,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        
+
+        migrateLegacyUserDefaultsIfNeeded()
         loadSettings()
         setupStatusBar()
         setupMenu()
@@ -328,6 +336,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let runningApps = NSWorkspace.shared.runningApplications
         let currentPID = ProcessInfo.processInfo.processIdentifier
         let currentExecutablePath = Bundle.main.executablePath
+        let conflictingBundleIdentifiers = Set([
+            Bundle.main.bundleIdentifier,
+            AppIdentity.legacyBundleIdentifier
+        ].compactMap { $0 })
         
         print("检查单实例：当前进程 \(currentPID)，可执行路径：\(currentExecutablePath ?? "unknown")")
         
@@ -342,9 +354,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             // 备选方案：比较 bundle identifier (适用于发布版本)
-            if let bundleID = app.bundleIdentifier,
-               let currentBundleID = Bundle.main.bundleIdentifier {
-                return bundleID == currentBundleID
+            if let bundleID = app.bundleIdentifier {
+                return conflictingBundleIdentifiers.contains(bundleID)
             }
             
             return false
@@ -366,6 +377,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         return true
+    }
+
+    private func migrateLegacyUserDefaultsIfNeeded() {
+        guard Bundle.main.bundleIdentifier == AppIdentity.bundleIdentifier else { return }
+
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: AppIdentity.defaultsMigrationKey) else { return }
+
+        let legacyDomain = defaults.persistentDomain(forName: AppIdentity.legacyBundleIdentifier) ?? [:]
+        let currentDomain = defaults.persistentDomain(forName: AppIdentity.bundleIdentifier) ?? [:]
+
+        for (key, value) in legacyDomain where currentDomain[key] == nil {
+            defaults.set(value, forKey: key)
+        }
+
+        defaults.set(true, forKey: AppIdentity.defaultsMigrationKey)
+        defaults.synchronize()
+
+        if !legacyDomain.isEmpty {
+            print("✅ 已迁移旧版 20-20-20 用户设置到 TwentyGuard")
+        }
     }
     
     private func restoreSessionIfNeeded() -> Bool {
@@ -1098,8 +1130,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("✅ 成功加载版本历史数据")
 
         // 构建显示内容
-        let appName = versionData["app_name"] as? String ?? "20-20-20"
-        let version = versionData["current_version"] as? String ?? "1.1.0"
+        let appName = versionData["app_name"] as? String ?? AppIdentity.displayName
+        let version = versionData["current_version"] as? String ?? "1.4.0"
 
         var creditsText = ""
 
@@ -1207,7 +1239,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 使用默认信息显示
         let defaultCredits = NSAttributedString(
-            string: "20-20-20 Eye Protection App\n\nAuthor: Javen Fang\nEmail: javen.out@gmail.com\nGitHub: @javenfang",
+            string: "TwentyGuard\n\nAuthor: Javen Fang\nEmail: javen.out@gmail.com\nGitHub: JavenGroup/TwentyGuard",
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11),
                 .foregroundColor: NSColor.labelColor
@@ -1215,9 +1247,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let options: [NSApplication.AboutPanelOptionKey: Any] = [
-            .applicationName: "20-20-20",
-            .applicationVersion: "1.1.0",
-            .version: "1.1.0",
+            .applicationName: AppIdentity.displayName,
+            .applicationVersion: "1.4.0",
+            .version: "1.4.0",
             .credits: defaultCredits
         ]
 
@@ -1534,7 +1566,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 button.image = statusIcon
             } else {
                 // Fallback to system symbol if custom icon not found
-                button.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "20-20-20 Eye Protection")
+                button.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "TwentyGuard")
             }
             
             let nightStatus = currentNightStatus()

@@ -1,7 +1,7 @@
-# 20-20-20 Mac App - 技术架构文档
+# TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.2.0
-> **最后更新**: 2026-04-26
+> **文档版本**: v1.4.0
+> **最后更新**: 2026-05-03
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -516,16 +516,16 @@ make clean        # 清理构建产物
 6. 生成 AppIcon.icns
 7. 打包完成
 
-**输出位置**: `build/20-20-20.app`
+**输出位置**: `build/TwentyGuard.app`
 
 ### 8.3 应用签名
 
 **Info.plist配置**:
 ```xml
 <key>CFBundleIdentifier</key>
-<string>com.example.twentytwentytwenty</string>
+<string>com.javengroup.twentyguard</string>
 <key>CFBundleVersion</key>
-<string>1.0</string>
+<string>1.4.0</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -540,7 +540,7 @@ make clean        # 清理构建产物
 make build-app && make install
 
 # 验证版本
-ps aux | grep 20-20-20
+ps aux | grep TwentyTwentyTwenty
 
 # 确保只有一个进程在运行
 make install  # 自动终止旧进程
@@ -618,7 +618,7 @@ make install  # 自动终止旧进程
 ps aux | grep 20-20-20
 
 # 查看可执行文件路径
-lsof -p <PID> | grep 20-20-20.app
+lsof -p <PID> | grep TwentyGuard.app
 
 # 重新安装
 make install
@@ -663,6 +663,8 @@ log show --predicate 'subsystem == "com.twentytwentytwenty"' --last 1h
     ├── 2025-10-31.jsonl      # 今日日志
     └── ...
 ```
+
+该目录名来自旧版 20-20-20，本次品牌迁移暂时保留它以避免丢失已有统计数据。
 
 **系统日志**:
 ```bash
@@ -747,6 +749,7 @@ du -h ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
 | v1.0.2 | 2025-10 | 添加 SQLite 数据库，健康统计功能 |
 | v1.1.0 | 2025-10-31 | 推迟机制重构：从单按钮限制改为累计时长限制 |
 | v1.2.0 | 2026-04-26 | 默认推迟上限降为 5 分钟，自定义模式支持 5/10 分钟上限 |
+| v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，更新 bundle 元数据、构建产物和发布路径 |
 
 ### B. 相关文档
 
@@ -758,9 +761,9 @@ du -h ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
 
 **维护者**: Javen Fang (@javenfang)
 **邮箱**: javen.out@gmail.com
-**GitHub**: https://github.com/javenfang/20-20-20
+**GitHub**: https://github.com/JavenGroup/TwentyGuard
 
 ---
 
-**最后更新**: 2026-04-26
-**文档版本**: v1.2.0
+**最后更新**: 2026-05-03
+**文档版本**: v1.4.0

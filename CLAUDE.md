@@ -15,11 +15,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**20-20-20 Mac App** - A native macOS menu bar application implementing the 20-20-20 rule (every 20 minutes, look at something 20 meters away for at least 20 seconds) to protect eye health.
+**TwentyGuard** - A native macOS menu bar application implementing strict 20-20-20 eye breaks, custom work rhythms, health statistics, postpone limits, and optional night screen lock.
 
 **Implementation Status**: ✅ **COMPLETE** - Fully implemented and ready for production use.
 
-**Key Features**: Work/break cycles, postpone functionality, health statistics, multi-language support, smart system event response
+**Key Features**: Work/break cycles, postpone limits, health statistics, night screen lock, multi-language support, smart system event response
 
 📖 **Detailed Features**: See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
 
@@ -79,7 +79,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **This Document**: Quick development guide with **build process and critical development notes**.
 
-**Current Implementation Docs (v1.2.0)**:
+**Current Implementation Docs**:
 - **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - Functional requirements: complete feature list and user scenarios
 - **[docs/architecture.md](docs/architecture.md)** - Technical architecture: in-depth implementation details and maintenance guide
 - **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug fix history: root cause analysis and fix records
@@ -103,7 +103,7 @@ make run        # Run development version directly (swift run)
 
 #### 2. Build App Bundle
 ```bash
-make build-app  # Build .app bundle to build/20-20-20.app
+make build-app  # Build .app bundle to build/TwentyGuard.app
                 # This is the ONLY standard build output location
 ```
 
@@ -123,7 +123,7 @@ make launch     # Launch version in /Applications/
 ```
 20-20-20/
 ├── build/              # ONLY build output directory
-│   └── 20-20-20.app   # make build-app output
+│   └── TwentyGuard.app # make build-app output
 ├── .build/            # Swift build intermediate files (auto-generated)
 └── Sources/           # Source code
 ```
@@ -199,6 +199,8 @@ make launch     # Step 3: Launch new version
 
 JSONL is the source of truth for event records; database is the query optimization layer. Any statistics issues should start investigation from JSONL.
 
+**Brand migration note**: The public app name, bundle name, and install path are now `TwentyGuard`, but local statistics data intentionally remains under `~/Library/Application Support/com.twentytwentytwenty/` until an explicit data-path migration is implemented.
+
 **When statistics window shows no data, check in this order:**
 
 1. **First Check JSONL Files** (are events recorded):
@@ -239,11 +241,11 @@ JSONL is the source of truth for event records; database is the query optimizati
 - Log viewing methods and database check commands
 - Performance monitoring metrics
 
-## 📱 App Store Readiness
+## 📱 Distribution Readiness
 
-- ✅ **Bundle ID**: `com.example.twentytwentytwenty`
-- ✅ **App Name**: "20-20-20"
-- ✅ **Version**: 1.2.0
+- ✅ **Bundle ID**: `com.javengroup.twentyguard`
+- ✅ **App Name**: "TwentyGuard"
+- ✅ **Version**: 1.4.0
 - ✅ **Minimum macOS**: 12.0
 - ✅ **Code Signing**: Configured
 - ✅ **Size**: ~952KB (extremely lightweight)

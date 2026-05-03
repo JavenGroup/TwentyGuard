@@ -72,7 +72,7 @@ class BreakOverlayWindow: NSWindow {
         contentView.addSubview(mainContainer)
         
         // Title label
-        let titleLabel = NSTextField(labelWithString: "20-20-20 Eye Protection")
+        let titleLabel = NSTextField(labelWithString: "TwentyGuard")
         titleLabel.font = NSFont.systemFont(ofSize: 28, weight: .medium)
         titleLabel.textColor = NSColor.labelColor
         titleLabel.alignment = .center

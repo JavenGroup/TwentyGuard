@@ -1,207 +1,103 @@
-# 20-20-20 护眼助手 (macOS)
+# TwentyGuard
 
 <div align="center">
 
-![20-20-20 App Icon](Sources/TwentyTwentyTwenty/Resources/statusbar_icon@2x.png)
+![TwentyGuard 状态栏图标](Sources/TwentyTwentyTwenty/Resources/statusbar_icon@2x.png)
 
-*一款轻量级菜单栏应用，帮助您遵循20-20-20护眼法则*
+**严格执行 20-20-20 护眼休息的 macOS 菜单栏应用。**
 
 [![macOS](https://img.shields.io/badge/macOS-12.0+-blue.svg)](https://www.apple.com/macos/)
-[![Swift](https://img.shields.io/badge/Swift-5.0-orange.svg)](https://swift.org/)
+[![Swift](https://img.shields.io/badge/Swift-5.9-orange.svg)](https://swift.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[下载安装](#-安装) • [功能特性](#-功能特性) • [使用说明](#-使用说明) • [源码构建](#️-源码构建) • [English](README.md)
+[下载安装](#安装) · [功能特性](#功能特性) · [源码构建](#源码构建) · [English](README.md)
 
 </div>
 
-## 关于应用
+TwentyGuard 是一款原生 macOS 菜单栏应用，适合那些明知道该休息、但总会继续盯着屏幕的人。它基于
+20-20-20 护眼法则，支持自定义工作节奏，限制反复推迟，提供眼睛健康统计，并可以在晚上逐步收紧屏幕使用时间，最后进入夜间禁用。
 
-**20-20-20护眼法则**是一个简单的减轻眼疲劳指南：每20分钟，看向20英尺（6米）外的物体至少20秒。这款轻量级macOS应用帮助您自动遵循这一法则。
+## 功能特性
 
-## ✨ 功能特性
+- **强制休息遮罩**：在多个屏幕上显示全屏休息提示。
+- **20-20-20 模式**：使用屏幕 20 分钟后，进行 20 秒眼睛休息。
+- **自定义模式**：支持 10 到 60 分钟的屏幕使用时长，包括 15、25、35、45 分钟。
+- **推迟上限**：可以推迟 1、2、5 分钟，但不能无限推迟。
+- **眼睛健康报告**：先给出今天的判断，再显示完成率、推迟情况和近几天明细。
+- **夜间禁用**：晚上先逐步缩短可用时间，到设定时间后完全禁用屏幕，早上自动恢复。
+- **本地优先**：设置、日志和统计数据都保存在本机。
+- **多语言**：支持 English、简体中文、Español、日本語、한국어。
 
-### 🎯 核心功能
-- **20-20-20模式**：默认定时（20分钟工作，20秒休息）
-- **自定义模式**：可调节工作时间（10-60分钟）和休息时间（10-600秒）
-- **立即休息**："立即休息"选项，随时开始休息
-- **智能延迟**：可延迟1、2或5分钟后再休息
+## 安装
 
-### 🖥️ 用户界面
-- **菜单栏集成**：不干扰的状态栏驻留
-- **全屏提醒**：模态休息通知窗口
-- **键盘快捷键**：快速延迟操作（⌘1、⌘2、⌘5）
-- **可选倒计时**：在菜单栏显示剩余时间
+1. 从 [Releases](https://github.com/JavenGroup/TwentyGuard/releases) 下载最新的 `TwentyGuard-vX.Y.Z.dmg`。
+2. 打开 DMG。
+3. 将 `TwentyGuard.app` 拖入 `Applications`。
+4. 从应用程序中启动 TwentyGuard。
 
-### 🌍 国际化支持
-- **5种语言**：English, 简体中文, Español, 日本語, 한국어
-- **自动检测**：自动使用系统语言设置
-- **运行时切换**：无需重启即可更换语言
+如果是未签名版本，首次启动可能需要右键点击应用，然后选择 **打开**。
 
-### ⚙️ 系统集成
-- **开机启动**：随macOS自动启动
-- **设置保存**：所有偏好设置自动保存
-- **深色模式**：适配系统外观主题
+## 使用
 
-## 📸 截图展示
+- 点击菜单栏图标，可以切换 20-20-20 模式和自定义模式。
+- 需要立即休息时，选择 **现在休息**。
+- 休息遮罩出现时，可以用 `Command-1`、`Command-2`、`Command-5` 在允许范围内推迟。
+- 打开 **眼睛健康报告**，可以快速看到今天是否健康，以及主要问题在哪里。
+- 开启 **夜间禁用** 后，可以让应用在晚上强制建立屏幕边界。
 
-### 菜单栏界面
-<img src="screenshots/menu_bar_interface.png" alt="20-20-20 菜单栏界面" width="500">
+## 源码构建
 
-*应用安静地驻留在菜单栏中，提供自定义图标和完整的设置选项。*
+环境要求：
 
-### 休息提醒
-<img src="screenshots/break_reminder.png?v=2" alt="20-20-20 休息提醒" width="500">
+- macOS 12.0+
+- Xcode 命令行工具或 Swift 5.9+
 
-*到了休息时间，会显示全屏提醒界面，包含延迟选项和键盘快捷键。*
-
-## 🚀 安装
-
-### 方式1：下载发布版（推荐）
-1. 从 [Releases](https://github.com/javenfang/20-20-20-Mac-App/releases) 下载最新的 `20-20-20-Eye-Protection-App-v1.0.0.dmg`
-2. 双击 DMG 文件打开
-3. 将 `20-20-20.app` 拖拽到 `Applications` 文件夹
-4. 推出 DMG 并删除 DMG 文件
-
-**⚠️ 首次启动（未签名应用）：**
-- 在应用程序文件夹中右键点击应用
-- 从右键菜单中选择 **"打开"**
-- 在确认对话框中点击 **"打开"**
-- 应用现在可以正常启动了
-
-**其他方法：**
-- 在应用程序文件夹中双击应用
-- macOS 会显示"无法打开，因为无法验证开发者"
-- 点击"取消"
-- 前往 **系统偏好设置** → **安全性与隐私** → **通用**
-- 您会看到关于"20-20-20"被阻止的消息，点击 **"仍要打开"**
-- 在确认对话框中点击 **"打开"**
-
-### 方式2：从源代码构建
-参见下方的 [源码构建](#️-源码构建) 部分。
-
-## 🎮 使用说明
-
-### 快速开始
-1. 启动应用 - 它会出现在菜单栏中
-2. 点击状态栏图标访问设置
-3. 选择20-20-20模式或自定义时间设置
-4. 应用会在适当时候提醒您休息！
-
-### 键盘快捷键
-在休息提醒期间：
-- **⌘1** - 延迟1分钟
-- **⌘2** - 延迟2分钟
-- **⌘5** - 延迟5分钟
-
-### 设置选项
-- **模式选择**：在默认模式和自定义定时之间切换
-- **自定义定时**：调整工作时间（10-60分钟）和休息时间（10-600秒）
-- **语言设置**：从5种支持的语言中选择
-- **自动启动**：登录时自动启动
-- **菜单栏倒计时**：可选显示剩余时间
-
-## 🛠️ 源码构建
-
-### 环境要求
-- **macOS 12.0+**
-- **Xcode 14.0+** 或 **Swift 5.0+**
-
-### 开发构建（Swift Package Manager）
 ```bash
-git clone https://github.com/javenfang/20-20-20-Mac-App.git
-cd 20-20-20-Mac-App
+git clone https://github.com/JavenGroup/TwentyGuard.git
+cd TwentyGuard
 make build
 make run
 ```
 
-### 创建发布包
-```bash
-# 构建独立应用包
-make build-app
+构建并安装应用：
 
-# 创建DMG发布文件
+```bash
+make build-app
+make install
+make launch
+```
+
+创建 DMG：
+
+```bash
 make dmg
 ```
 
-### 发布构建（Xcode）
-用于App Store分发：
-```bash
-# 克隆并进入项目目录
-git clone https://github.com/javenfang/20-20-20-Mac-App.git
-cd 20-20-20-Mac-App
+## 项目结构
 
-# 使用Xcode项目进行发布构建
-# （详情参见CLAUDE.md文档）
-```
-
-## 📁 项目结构
-
-```
-20-20-20-Mac-App/
+```text
+TwentyGuard/
 ├── Sources/
-│   └── TwentyTwentyTwenty/
-│       ├── AppDelegate.swift           # 主应用逻辑
-│       ├── BreakOverlayWindow.swift    # 休息提醒窗口
-│       ├── main.swift                  # 程序入口
-│       └── Resources/                  # 状态栏图标
-├── Package.swift                       # Swift Package Manager配置
-├── Makefile                           # 构建快捷脚本
-├── CLAUDE.md                          # 技术文档
-└── README.md                          # 说明文档（英文）
+│   ├── TwentyTwentyTwenty/       # macOS 应用 target
+│   └── TwentyTwentyTwentyCore/   # 共享策略与统计逻辑
+├── docs/                         # 产品与技术文档
+├── marketing/                    # 推广定位与文案草稿
+├── scripts/                      # 发布辅助脚本
+├── Info.plist
+├── Makefile
+└── Package.swift
 ```
 
-## 🌟 为什么选择这款应用？
+内部 Swift target 仍沿用最初的工程命名；公开品牌、bundle 元数据、构建产物、安装路径和发布资产都使用 TwentyGuard。
 
-### 轻量高效
-- **小巧体积**：仅952KB安装大小
-- **无后台处理**：最小CPU和内存使用
-- **完全离线**：无需网络连接，保护您的隐私
+## 隐私
 
-### 精心设计
-- **不干扰**：安静地驻留在菜单栏
-- **灵活定制**：自定义时间匹配您的工作流程
-- **无障碍访问**：完整的键盘导航和快捷键
-- **国际化**：使用您偏好的语言
+TwentyGuard 的核心功能不需要网络访问。设置、会话日志和统计数据都保存在你的 Mac 本机。
 
-### 开源透明
-- **代码公开**：完整源代码可供查看
-- **可定制**：根据需要修改功能
-- **社区驱动**：欢迎贡献和改进
+## 贡献
 
-## 🤝 贡献
+欢迎提交 issue 和 pull request。涉及核心行为的修改，建议先开 issue 讨论，保持产品方向清晰：界面克制、休息严格、数据本地优先。
 
-欢迎贡献！请随时提交Pull Request。对于重大更改，请先开issue讨论您想要改变的内容。
+## 开源许可
 
-### 开发环境设置
-1. 克隆仓库
-2. 使用Xcode或Swift Package Manager打开
-3. 进行更改
-4. 充分测试
-5. 提交pull request
-
-## 📄 开源许可
-
-本项目基于MIT许可证开源 - 详见 [LICENSE](LICENSE) 文件。
-
-## 🙏 致谢
-
-- 灵感来源于眼科专家推荐的20-20-20护眼法则
-- 使用Swift和AppKit构建，提供原生macOS体验
-- 图标设计注重清晰度和系统集成
-
-## ❤️ 支持项目
-
-如果这款应用帮助保护了您的眼睛，改善了屏幕使用习惯，请考虑：
-- ⭐ 为这个仓库点星
-- 🐛 报告问题或建议新功能
-- 🔄 与朋友和同事分享
-
----
-
-<div align="center">
-
-**爱护眼睛 - 它们是您唯一的一双！ 👀**
-
-用 ❤️ 为健康的屏幕使用时间而制作
-
-</div>
+MIT License。详见 [LICENSE](LICENSE)。

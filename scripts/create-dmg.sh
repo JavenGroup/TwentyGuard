@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# 20-20-20 App DMG Creation Script
+# TwentyGuard DMG Creation Script
 # Creates a professional DMG file for distribution
 
 set -e
 
 # Configuration
-APP_NAME="20-20-20"
-APP_PATH="./build/20-20-20.app"
-DMG_NAME="20-20-20-Eye-Protection-App"
-VERSION="1.0.0"
+APP_NAME="TwentyGuard"
+APP_PATH="./build/${APP_NAME}.app"
+DMG_NAME="TwentyGuard"
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist 2>/dev/null || echo "1.4.0")
 DMG_BACKGROUND_IMG="dmg_background.png"
 DMG_WINDOW_X=200
 DMG_WINDOW_Y=120
