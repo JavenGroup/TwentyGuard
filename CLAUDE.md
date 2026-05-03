@@ -67,7 +67,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 🏗️ Project Structure
 
 **Single Project Architecture** (Swift Package Manager):
-- Location: `/Users/javenfang/Projects/20-20-20/`
+- Location: `/Users/javenfang/Projects/TwentyGuard/`
+- Legacy compatibility symlink: `/Users/javenfang/Projects/20-20-20 -> TwentyGuard`
 - No Xcode project files needed, everything managed via Makefile
 - Core Files: AppDelegate.swift, BreakOverlayWindow.swift, EventRecorder.swift, StatsDatabase.swift
 
@@ -97,7 +98,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 #### 1. Development & Debugging
 ```bash
-cd /Users/javenfang/Projects/20-20-20/
+cd /Users/javenfang/Projects/TwentyGuard/
 make run        # Run development version directly (swift run)
 ```
 
@@ -121,7 +122,7 @@ make launch     # Launch version in /Applications/
 
 ### 📁 Standard Directory Structure
 ```
-20-20-20/
+TwentyGuard/
 ├── build/              # ONLY build output directory
 │   └── TwentyGuard.app # make build-app output
 ├── .build/            # Swift build intermediate files (auto-generated)
@@ -144,7 +145,7 @@ make launch     # Step 3: Launch new version
 ## 🔧 Maintenance Notes
 
 ### Development Workflow
-- **Source of Truth**: Swift Package Manager project (`/Users/javenfang/Projects/20-20-20/`)
+- **Source of Truth**: Swift Package Manager project (`/Users/javenfang/Projects/TwentyGuard/`)
 - **Build Management**: All builds unified through Makefile
 - **Asset Management**: Resource files centrally managed in Sources/ directory
 
