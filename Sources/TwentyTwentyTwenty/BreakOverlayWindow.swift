@@ -15,6 +15,7 @@ class BreakOverlayWindow: NSWindow {
     private var postpone2Button: NSButton!
     private var postpone5Button: NSButton!
     private var postponeStatusLabel: NSTextField!  // 底部状态提示标签
+    private var nightWindDownHint: String?
 
     // Localization closure
     private var localizer: ((String) -> String)?
@@ -380,11 +381,21 @@ class BreakOverlayWindow: NSWindow {
                 let statusText = String(format: localizer("postpone_status"), used, remaining)
                 postponeStatusLabel.stringValue = statusText
                 postponeStatusLabel.isHidden = false
+            } else if let nightWindDownHint, !nightWindDownHint.isEmpty {
+                postponeStatusLabel.stringValue = nightWindDownHint
+                postponeStatusLabel.isHidden = false
             } else {
                 // 首次显示休息窗口，未推迟过
                 postponeStatusLabel.isHidden = true
             }
         }
+    }
+
+    func setNightWindDownHint(_ hint: String?) {
+        nightWindDownHint = hint
+        guard let hint, !hint.isEmpty else { return }
+        postponeStatusLabel.stringValue = hint
+        postponeStatusLabel.isHidden = false
     }
 
     /// 更新按钮的启用状态和视觉样式

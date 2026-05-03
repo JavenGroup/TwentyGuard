@@ -1,11 +1,13 @@
 import Cocoa
 import ServiceManagement
+import TwentyTwentyTwentyCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarItem: NSStatusItem!
     private var menu: NSMenu!
     private var workTimer: Timer?
     private var breakTimer: Timer?
+    private var nightLockTimer: Timer?
     private var menuUpdateTimer: Timer?
     private var stateSnapshotTimer: Timer?
     
@@ -21,7 +23,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private var timerMenuItem: NSMenuItem!
     private var breakOverlays: [BreakOverlayWindow] = []
+    private var nightLockOverlays: [NightRestrictionOverlayWindow] = []
     private var loginItemMenuItem: NSMenuItem!
+    private var nightRestrictionMenuItem: NSMenuItem!
     private var healthStatsWindow: StatsDashboardWindow?
     
     // 事件记录器（新的统一系统）
@@ -42,6 +46,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var postponeLimitMenuItems: [NSMenuItem] = []
     private var showCountdownInStatusBar: Bool = false
     private var showCountdownMenuItem: NSMenuItem!
+
+    // Night restriction settings
+    private let nightPolicy = NightRestrictionPolicy()
+    private var nightRestrictionSettings = NightRestrictionSettings()
+    private var nightLockOverrideUntil: Date?
     
     // Language settings
     private var currentLanguage: String = ""
@@ -52,13 +61,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isCompletingBreakSession = false
     
     // MARK: - Computed Properties for Time Calculation
+
+    private var effectiveWorkDuration: Int {
+        currentNightStatus().effectiveWorkDurationSeconds
+    }
     
     private var workTimeRemaining: TimeInterval {
         guard let startTime = workSessionStartTime else {
-            return TimeInterval(currentWorkDuration)
+            return TimeInterval(effectiveWorkDuration)
         }
         let elapsed = Date().timeIntervalSince(startTime)
-        return max(0, TimeInterval(currentWorkDuration) - elapsed)
+        return max(0, TimeInterval(effectiveWorkDuration) - elapsed)
     }
     
     private var breakTimeRemaining: TimeInterval {
@@ -120,7 +133,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "close": "关闭",
             "eye_health_report": "👁️ 眼睛健康报告",
             "about": "关于",
-            "postponeLimit": "推迟上限"
+            "postponeLimit": "推迟上限",
+            "nightRestriction": "夜间禁用",
+            "nightRestrictionEnabled": "启用夜间禁用",
+            "nightWindDownStart": "收紧开始",
+            "nightLockStart": "完全禁用",
+            "nightUnlockTime": "恢复可用",
+            "nightRhythmToday": "今日节奏",
+            "nightTestingExit": "显示测试退出",
+            "nightWindDownStatus": "夜间收紧",
+            "nightLockedStatus": "夜间禁用中",
+            "nightDisabled": "禁用",
+            "nightWindDownBreakHint": "夜间收紧中，当前屏幕使用上限：%@，%@ 后将完全禁用屏幕"
         ],
         "en": [
             "screenUsage": "Screen Time",
@@ -151,7 +175,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "close": "Close",
             "eye_health_report": "👁️ Eye Health Report",
             "about": "About",
-            "postponeLimit": "Postpone Limit"
+            "postponeLimit": "Postpone Limit",
+            "nightRestriction": "Night Screen Lock",
+            "nightRestrictionEnabled": "Enable Night Screen Lock",
+            "nightWindDownStart": "Wind-down Starts",
+            "nightLockStart": "Full Lock Starts",
+            "nightUnlockTime": "Unlocks",
+            "nightRhythmToday": "Today's Rhythm",
+            "nightTestingExit": "Show Testing Escape",
+            "nightWindDownStatus": "Night Wind-down",
+            "nightLockedStatus": "Night Lock Active",
+            "nightDisabled": "Locked",
+            "nightWindDownBreakHint": "Night wind-down: current screen-use limit is %@. Full lock starts at %@"
         ],
         "es": [
             "screenUsage": "Tiempo de Pantalla",
@@ -276,6 +311,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 启动状态快照计时器（每10秒记录一次状态）
         startStateSnapshotTimer()
+        _ = applyNightRestrictionState(reason: "app_launch")
     }
     
     private func checkSingleInstance() -> Bool {
@@ -348,16 +384,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 恢复工作会话
             if let workStart = savedState.workStartTime {
                 let workElapsed = Date().timeIntervalSince(workStart)
-                let maxWorkTime = TimeInterval(currentWorkDuration) + 2 * 60 // 允许2分钟缓冲
+                let plannedWorkDuration = effectiveWorkDuration
+                let maxWorkTime = TimeInterval(plannedWorkDuration) + 2 * 60 // 允许2分钟缓冲
                 
                 if workElapsed < maxWorkTime {
                     // 继续工作会话
                     workSessionStartTime = workStart
                     // 在数据库中记录恢复的会话，使用原始开始时间
-                    eventRecorder.startWorkSession(duration: currentWorkDuration, startTime: workStart)
+                    eventRecorder.startWorkSession(duration: plannedWorkDuration, startTime: workStart)
                     print("🔄 恢复工作会话，已用时 \(Int(workElapsed))秒，剩余 \(Int(workTimeRemaining))秒")
                     
-                    if workElapsed >= TimeInterval(currentWorkDuration) {
+                    if workElapsed >= TimeInterval(plannedWorkDuration) {
                         // 工作时间已到，立即进入休息
                         logManager.logWorkCompleted(duration: workElapsed)
                         showBreakOverlay()
@@ -444,6 +481,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let savedPostponeLimit = UserDefaults.standard.integer(forKey: "maxPostponeMinutes")
         customPostponeLimitMinutes = [5, 10].contains(savedPostponeLimit) ? savedPostponeLimit : 5
 
+        nightRestrictionSettings = NightRestrictionSettings(
+            isEnabled: UserDefaults.standard.bool(forKey: "nightRestrictionEnabled"),
+            windDownStart: loadClockTime(forKey: "nightWindDownStartMinutes", defaultValue: ClockTime(hour: 20, minute: 0)),
+            lockStart: loadClockTime(forKey: "nightLockStartMinutes", defaultValue: ClockTime(hour: 21, minute: 0)),
+            unlockTime: loadClockTime(forKey: "nightUnlockMinutes", defaultValue: ClockTime(hour: 7, minute: 0)),
+            testingExitEnabled: UserDefaults.standard.object(forKey: "nightTestingExitEnabled") == nil ? true : UserDefaults.standard.bool(forKey: "nightTestingExitEnabled")
+        )
+        nightLockOverrideUntil = UserDefaults.standard.object(forKey: "nightLockOverrideUntil") as? Date
+        clearExpiredNightLockOverride()
+
         // Apply the loaded settings
         if isCustomMode {
             currentWorkDuration = customWorkDuration
@@ -463,6 +510,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(customBreakDuration, forKey: "customBreakDuration")
         UserDefaults.standard.set(currentLanguage, forKey: "currentLanguage")
         UserDefaults.standard.set(customPostponeLimitMinutes, forKey: "maxPostponeMinutes")
+        UserDefaults.standard.set(nightRestrictionSettings.isEnabled, forKey: "nightRestrictionEnabled")
+        UserDefaults.standard.set(nightRestrictionSettings.windDownStart.minutesAfterMidnight, forKey: "nightWindDownStartMinutes")
+        UserDefaults.standard.set(nightRestrictionSettings.lockStart.minutesAfterMidnight, forKey: "nightLockStartMinutes")
+        UserDefaults.standard.set(nightRestrictionSettings.unlockTime.minutesAfterMidnight, forKey: "nightUnlockMinutes")
+        UserDefaults.standard.set(nightRestrictionSettings.testingExitEnabled, forKey: "nightTestingExitEnabled")
+        if let nightLockOverrideUntil {
+            UserDefaults.standard.set(nightLockOverrideUntil, forKey: "nightLockOverrideUntil")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "nightLockOverrideUntil")
+        }
 
         // 记录设置变更
         let changes: [String: String] = [
@@ -472,7 +529,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "custom_break_duration": "\(customBreakDuration)",
             "language": currentLanguage,
             "custom_postpone_limit_minutes": "\(customPostponeLimitMinutes)",
-            "effective_postpone_limit_minutes": "\(Int(maxTotalPostponeTime / 60))"
+            "effective_postpone_limit_minutes": "\(Int(maxTotalPostponeTime / 60))",
+            "night_restriction_enabled": "\(nightRestrictionSettings.isEnabled)",
+            "night_wind_down_start": nightRestrictionSettings.windDownStart.displayString,
+            "night_lock_start": nightRestrictionSettings.lockStart.displayString,
+            "night_unlock_time": nightRestrictionSettings.unlockTime.displayString,
+            "night_testing_exit_enabled": "\(nightRestrictionSettings.testingExitEnabled)"
         ]
         eventRecorder.recordSettingsChange(changes: changes)
     }
@@ -551,6 +613,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         showCountdownMenuItem.target = self
         updateShowCountdownState()
         menu.addItem(showCountdownMenuItem)
+
+        setupNightRestrictionMenu()
         
         menu.addItem(NSMenuItem.separator())
 
@@ -751,6 +815,178 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             removeCustomModeSubItems()
             addCustomModeSubItems()
         }
+    }
+
+    private func loadClockTime(forKey key: String, defaultValue: ClockTime) -> ClockTime {
+        guard UserDefaults.standard.object(forKey: key) != nil else { return defaultValue }
+        let minutes = min(23 * 60 + 59, max(0, UserDefaults.standard.integer(forKey: key)))
+        return ClockTime(minutesAfterMidnight: minutes)
+    }
+
+    private func setupNightRestrictionMenu() {
+        nightRestrictionMenuItem = NSMenuItem(title: localized("nightRestriction"), action: nil, keyEquivalent: "")
+        nightRestrictionMenuItem.submenu = buildNightRestrictionSubmenu()
+        menu.addItem(nightRestrictionMenuItem)
+    }
+
+    private func rebuildNightRestrictionMenu() {
+        guard nightRestrictionMenuItem != nil else { return }
+        nightRestrictionMenuItem.title = localized("nightRestriction")
+        nightRestrictionMenuItem.submenu = buildNightRestrictionSubmenu()
+    }
+
+    private func buildNightRestrictionSubmenu() -> NSMenu {
+        enforceNightScheduleOrder()
+
+        let submenu = NSMenu()
+
+        let enabledItem = NSMenuItem(title: localized("nightRestrictionEnabled"), action: #selector(toggleNightRestriction), keyEquivalent: "")
+        enabledItem.target = self
+        enabledItem.state = nightRestrictionSettings.isEnabled ? .on : .off
+        submenu.addItem(enabledItem)
+
+        submenu.addItem(NSMenuItem.separator())
+
+        let windDownItem = NSMenuItem(
+            title: "\(localized("nightWindDownStart")): \(nightRestrictionSettings.windDownStart.displayString)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        windDownItem.submenu = buildTimeSelectionMenu(
+            options: timeOptions(from: 18 * 60, through: 23 * 60),
+            selected: nightRestrictionSettings.windDownStart,
+            action: #selector(selectNightWindDownStart(_:))
+        )
+        submenu.addItem(windDownItem)
+
+        var lockOptions = timeOptions(from: 18 * 60 + 30, through: 23 * 60 + 30)
+            .filter { $0 > nightRestrictionSettings.windDownStart }
+        if !lockOptions.contains(nightRestrictionSettings.lockStart),
+           nightRestrictionSettings.lockStart > nightRestrictionSettings.windDownStart {
+            lockOptions.append(nightRestrictionSettings.lockStart)
+            lockOptions.sort()
+        }
+        let lockItem = NSMenuItem(
+            title: "\(localized("nightLockStart")): \(nightRestrictionSettings.lockStart.displayString)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        lockItem.submenu = buildTimeSelectionMenu(
+            options: lockOptions,
+            selected: nightRestrictionSettings.lockStart,
+            action: #selector(selectNightLockStart(_:))
+        )
+        submenu.addItem(lockItem)
+
+        let unlockItem = NSMenuItem(
+            title: "\(localized("nightUnlockTime")): \(nightRestrictionSettings.unlockTime.displayString)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        unlockItem.submenu = buildTimeSelectionMenu(
+            options: timeOptions(from: 5 * 60, through: 10 * 60),
+            selected: nightRestrictionSettings.unlockTime,
+            action: #selector(selectNightUnlockTime(_:))
+        )
+        submenu.addItem(unlockItem)
+
+        submenu.addItem(NSMenuItem.separator())
+
+        let rhythmItem = NSMenuItem(title: nightRhythmSummary(), action: nil, keyEquivalent: "")
+        rhythmItem.isEnabled = false
+        submenu.addItem(rhythmItem)
+
+        let testingExitItem = NSMenuItem(title: localized("nightTestingExit"), action: #selector(toggleNightTestingExit), keyEquivalent: "")
+        testingExitItem.target = self
+        testingExitItem.state = nightRestrictionSettings.testingExitEnabled ? .on : .off
+        submenu.addItem(testingExitItem)
+
+        return submenu
+    }
+
+    private func buildTimeSelectionMenu(options: [ClockTime], selected: ClockTime, action: Selector) -> NSMenu {
+        let submenu = NSMenu()
+        for time in options {
+            let item = NSMenuItem(title: time.displayString, action: action, keyEquivalent: "")
+            item.target = self
+            item.tag = time.minutesAfterMidnight
+            item.state = (time == selected) ? .on : .off
+            submenu.addItem(item)
+        }
+        return submenu
+    }
+
+    private func timeOptions(from startMinute: Int, through endMinute: Int, step: Int = 30) -> [ClockTime] {
+        guard startMinute <= endMinute else { return [] }
+        return stride(from: startMinute, through: endMinute, by: step).map {
+            ClockTime(minutesAfterMidnight: $0)
+        }
+    }
+
+    private func enforceNightScheduleOrder() {
+        if nightRestrictionSettings.lockStart <= nightRestrictionSettings.windDownStart {
+            let adjustedLockMinute = min(23 * 60 + 30, nightRestrictionSettings.windDownStart.minutesAfterMidnight + 60)
+            nightRestrictionSettings.lockStart = ClockTime(minutesAfterMidnight: adjustedLockMinute)
+        }
+    }
+
+    private func nightRhythmSummary() -> String {
+        let base = formatDurationForMenu(currentWorkDuration)
+        let stages = NightRestrictionPolicy.windDownLimits(baseWorkDurationSeconds: currentWorkDuration)
+            .map(formatDurationForMenu)
+            .joined(separator: " → ")
+        return "\(localized("nightRhythmToday")): \(base) → \(stages) → \(localized("nightDisabled"))"
+    }
+
+    private func formatDurationForMenu(_ seconds: Int) -> String {
+        "\(max(1, seconds / 60)) \(localized("minutes"))"
+    }
+
+    @objc private func toggleNightRestriction() {
+        nightRestrictionSettings.isEnabled.toggle()
+        saveSettings()
+        rebuildNightRestrictionMenu()
+        _ = applyNightRestrictionState(reason: "night_setting_toggle")
+        updateMenuTimer()
+        updateStatusBarTitle()
+    }
+
+    @objc private func selectNightWindDownStart(_ sender: NSMenuItem) {
+        nightRestrictionSettings.windDownStart = ClockTime(minutesAfterMidnight: sender.tag)
+        enforceNightScheduleOrder()
+        saveSettings()
+        rebuildNightRestrictionMenu()
+        _ = applyNightRestrictionState(reason: "night_wind_down_changed")
+        updateMenuTimer()
+        updateStatusBarTitle()
+    }
+
+    @objc private func selectNightLockStart(_ sender: NSMenuItem) {
+        let selected = ClockTime(minutesAfterMidnight: sender.tag)
+        guard selected > nightRestrictionSettings.windDownStart else { return }
+
+        nightRestrictionSettings.lockStart = selected
+        saveSettings()
+        rebuildNightRestrictionMenu()
+        _ = applyNightRestrictionState(reason: "night_lock_start_changed")
+        updateMenuTimer()
+        updateStatusBarTitle()
+    }
+
+    @objc private func selectNightUnlockTime(_ sender: NSMenuItem) {
+        nightRestrictionSettings.unlockTime = ClockTime(minutesAfterMidnight: sender.tag)
+        saveSettings()
+        rebuildNightRestrictionMenu()
+        _ = applyNightRestrictionState(reason: "night_unlock_changed")
+        updateMenuTimer()
+        updateStatusBarTitle()
+    }
+
+    @objc private func toggleNightTestingExit() {
+        nightRestrictionSettings.testingExitEnabled.toggle()
+        saveSettings()
+        rebuildNightRestrictionMenu()
+        refreshNightLockOverlays()
     }
     
     @objc private func statusBarButtonClicked() {
@@ -1035,8 +1271,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         workTimer?.invalidate()
         breakTimer?.invalidate()
+        nightLockTimer?.invalidate()
         menuUpdateTimer?.invalidate()
         stateSnapshotTimer?.invalidate()
+        for overlay in nightLockOverlays {
+            overlay.hideOverlay()
+        }
+        nightLockOverlays.removeAll()
         
         // Clean up notification observers
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -1058,6 +1299,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         saveSettings()
         updateModeMenuStates()
+        rebuildNightRestrictionMenu()
         restartWorkTimer()
     }
     
@@ -1073,6 +1315,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             addCustomModeSubItems()
             saveSettings()
             updateModeMenuStates()
+            rebuildNightRestrictionMenu()
             restartWorkTimer()
         }
     }
@@ -1083,6 +1326,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateCustomModeSubItems()
         updateModeMenuStates()
         saveSettings()
+        rebuildNightRestrictionMenu()
         restartWorkTimer()
     }
     
@@ -1128,6 +1372,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func restartWorkTimer() {
+        if applyNightRestrictionState(reason: "restart_work_timer") {
+            return
+        }
+
         // 停止当前工作会话（如果有）
         if let startTime = workSessionStartTime {
             let elapsed = Date().timeIntervalSince(startTime)
@@ -1146,7 +1394,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         saveCurrentSessionState()
 
         // 使用新的事件记录器
-        eventRecorder.startWorkSession(duration: currentWorkDuration)
+        eventRecorder.startWorkSession(duration: effectiveWorkDuration)
         
         // 启动UI更新计时器
         workTimer?.invalidate()
@@ -1156,13 +1404,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startWorkTimer() {
+        if applyNightRestrictionState(reason: "start_work_timer") {
+            return
+        }
+
         // 如果在推迟期间，不要重置工作会话
         if !isPostponeActive {
             // 如果还没有开始工作会话，则开始一个新的
             if workSessionStartTime == nil {
                 workSessionStartTime = Date()
                 eventRecorder.recordTimerReset(reason: "fresh_start")
-                eventRecorder.startWorkSession(duration: currentWorkDuration)
+                eventRecorder.startWorkSession(duration: effectiveWorkDuration)
             }
         }
         
@@ -1179,6 +1431,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func updateWorkTimer() {
+        if applyNightRestrictionState(reason: "work_timer_tick") {
+            return
+        }
+
         updateMenuTimer()
         updateStatusBarTitle()
 
@@ -1206,6 +1462,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 首先停止定时器，无论后续操作是否成功
         workTimer?.invalidate()
         workTimer = nil
+
+        if applyNightRestrictionState(reason: "complete_work_session") {
+            isCompletingWorkSession = false
+            return
+        }
         
         if let startTime = workSessionStartTime {
             let actualDuration = Date().timeIntervalSince(startTime)
@@ -1230,7 +1491,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 button.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "20-20-20 Eye Protection")
             }
             
-            if showCountdownInStatusBar {
+            let nightStatus = currentNightStatus()
+
+            if nightStatus.isLocked {
+                button.title = " " + localized("nightLockedStatus")
+            } else if showCountdownInStatusBar {
                 // 如果处于推迟状态，显示推迟倒计时
                 if isPostponeActive {
                     button.title = " " + formatStatusBarTime(Int(postponeTimeRemaining))
@@ -1306,16 +1571,193 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let secs = totalSeconds % 60
         return String(format: "%@: %02d:%02d", localized("screenUsage"), minutes, secs)
     }
+
+    private func currentNightStatus(now: Date = Date()) -> NightRestrictionStatus {
+        clearExpiredNightLockOverride(now: now)
+        return nightPolicy.status(
+            now: now,
+            baseWorkDurationSeconds: currentWorkDuration,
+            settings: nightRestrictionSettings,
+            disabledUntil: nightLockOverrideUntil
+        )
+    }
+
+    private func clearExpiredNightLockOverride(now: Date = Date()) {
+        guard let overrideUntil = nightLockOverrideUntil, now >= overrideUntil else { return }
+        nightLockOverrideUntil = nil
+        UserDefaults.standard.removeObject(forKey: "nightLockOverrideUntil")
+    }
+
+    @discardableResult
+    private func applyNightRestrictionState(reason: String) -> Bool {
+        let status = currentNightStatus()
+
+        switch status.phase {
+        case .locked(let unlockTime):
+            enterNightLock(unlockTime: unlockTime, schedule: status.schedule, reason: reason)
+            return true
+
+        case .windDown(let limitSeconds, _, _, _, _):
+            if !nightLockOverlays.isEmpty {
+                leaveNightLock(startFreshWorkSession: true)
+                return true
+            }
+
+            if let workSessionStartTime,
+               !isPostponeActive,
+               !isCompletingWorkSession,
+               Date().timeIntervalSince(workSessionStartTime) >= TimeInterval(limitSeconds) {
+                print("🌙 夜间收紧阶段达到当前上限，进入休息")
+                completeWorkSession()
+                return true
+            }
+
+            return false
+
+        case .normal:
+            if !nightLockOverlays.isEmpty {
+                leaveNightLock(startFreshWorkSession: true)
+                return true
+            }
+            return false
+        }
+    }
+
+    private func enterNightLock(unlockTime: Date, schedule: NightRestrictionSchedule, reason: String) {
+        if !nightLockOverlays.isEmpty {
+            refreshNightLockOverlays()
+            startNightLockTimer()
+            updateMenuTimer()
+            updateStatusBarTitle()
+            return
+        }
+
+        print("🌙 进入夜间禁用：\(reason)")
+        closeHealthStatsWindowIfNeeded()
+        cleanupBreakOverlays()
+
+        workTimer?.invalidate()
+        workTimer = nil
+        breakTimer?.invalidate()
+        breakTimer = nil
+        menuUpdateTimer?.invalidate()
+        menuUpdateTimer = nil
+
+        if let startTime = workSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logWorkPaused(duration: elapsed, reason: "night_lock_\(reason)")
+            eventRecorder.endWorkSession()
+        }
+
+        if let startTime = breakSessionStartTime {
+            let elapsed = Date().timeIntervalSince(startTime)
+            logManager.logBreakCompleted(actualDuration: elapsed, expectedDuration: currentBreakDuration)
+            eventRecorder.endBreakSession()
+        }
+
+        workSessionStartTime = nil
+        breakSessionStartTime = nil
+        postponeStartTime = nil
+        postponeDuration = 0
+        totalPostponedTime = 0
+        saveCurrentSessionState()
+
+        for screen in NSScreen.screens {
+            let overlay = NightRestrictionOverlayWindow(screen: screen)
+            overlay.nightDelegate = self
+            overlay.configure(
+                unlockTime: unlockTime,
+                scheduleText: nightScheduleText(schedule),
+                testingExitEnabled: nightRestrictionSettings.testingExitEnabled
+            )
+            overlay.showOverlay()
+            nightLockOverlays.append(overlay)
+        }
+
+        startNightLockTimer()
+        updateMenuTimer()
+        updateStatusBarTitle()
+    }
+
+    private func startNightLockTimer() {
+        nightLockTimer?.invalidate()
+        nightLockTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateNightLockTimer()
+        }
+    }
+
+    private func updateNightLockTimer() {
+        let status = currentNightStatus()
+
+        if case .locked(let unlockTime) = status.phase {
+            for overlay in nightLockOverlays {
+                overlay.update(unlockTime: unlockTime, now: Date())
+            }
+        } else {
+            leaveNightLock(startFreshWorkSession: true)
+        }
+    }
+
+    private func leaveNightLock(startFreshWorkSession: Bool) {
+        nightLockTimer?.invalidate()
+        nightLockTimer = nil
+
+        for overlay in nightLockOverlays {
+            overlay.hideOverlay()
+        }
+        nightLockOverlays.removeAll()
+
+        updateMenuTimer()
+        updateStatusBarTitle()
+
+        if startFreshWorkSession, workSessionStartTime == nil, breakSessionStartTime == nil {
+            startWorkTimer()
+        }
+    }
+
+    private func refreshNightLockOverlays() {
+        let status = currentNightStatus()
+        guard case .locked(let unlockTime) = status.phase else { return }
+
+        let scheduleText = nightScheduleText(status.schedule)
+        for overlay in nightLockOverlays {
+            overlay.configure(
+                unlockTime: unlockTime,
+                scheduleText: scheduleText,
+                testingExitEnabled: nightRestrictionSettings.testingExitEnabled
+            )
+        }
+    }
+
+    private func nightScheduleText(_ schedule: NightRestrictionSchedule) -> String {
+        "\(schedule.windDownStartTime.displayString) \(localized("nightWindDownStart")) · \(schedule.lockStartTime.displayString) \(localized("nightLockStart")) · \(schedule.unlockClockTime.displayString) \(localized("nightUnlockTime"))"
+    }
+
+    private func nightWindDownHint(for status: NightRestrictionStatus) -> String? {
+        guard case .windDown(let limitSeconds, _, _, let lockStart, _) = status.phase else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let limitText = formatDurationForMenu(limitSeconds)
+        return String(format: localized("nightWindDownBreakHint"), limitText, formatter.string(from: lockStart))
+    }
     
     // MARK: - Helper Methods
     
     private func updateMenuTimer() {
-        if isPostponeActive {
+        let nightStatus = currentNightStatus()
+
+        if nightStatus.isLocked {
+            timerMenuItem.title = "\(localized("nightLockedStatus")) · \(localized("nightUnlockTime")) \(nightStatus.schedule.unlockClockTime.displayString)"
+        } else if isPostponeActive {
             // 推迟期间显示推迟倒计时
             let totalSeconds = Int(postponeTimeRemaining)
             let minutes = totalSeconds / 60
             let secs = totalSeconds % 60
             timerMenuItem.title = String(format: "%@: %02d:%02d (%@)", localized("screenUsage"), minutes, secs, localized("postponed"))
+        } else if case .windDown(_, _, _, let lockStart, _) = nightStatus.phase {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            timerMenuItem.title = "\(localized("nightWindDownStatus")): \(formatStatusBarTime(Int(workTimeRemaining))) · \(formatter.string(from: lockStart)) \(localized("nightLockStart"))"
         } else {
             timerMenuItem.title = formatWorkTime(workTimeRemaining)
         }
@@ -1360,6 +1802,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func showBreakOverlay() {
         print("🎭 showBreakOverlay 被调用")
+
+        if applyNightRestrictionState(reason: "before_break_overlay") {
+            return
+        }
+
         closeHealthStatsWindowIfNeeded()
 
         // 防止重复创建窗口 - 如果已有窗口，先清理
@@ -1406,6 +1853,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let usedMinutes = Int(totalPostponedTime / 60)
             let remainingMinutes = Int((maxTotalPostponeTime - totalPostponedTime) / 60)
             overlay.updatePostponeStatus(used: usedMinutes, remaining: remainingMinutes)
+            overlay.setNightWindDownHint(nightWindDownHint(for: currentNightStatus()))
 
             overlay.showOverlay()
             breakOverlays.append(overlay)
@@ -1434,6 +1882,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func updateBreakTimer() {
+        if applyNightRestrictionState(reason: "break_timer_tick") {
+            return
+        }
+
         let remaining = Int(breakTimeRemaining)
 
         // 检测异常情况：如果休息时间已经超过预期很多，可能是系统睡眠导致的
@@ -1675,6 +2127,21 @@ extension AppDelegate: BreakOverlayDelegate {
     }
 }
 
+extension AppDelegate: NightRestrictionOverlayDelegate {
+    func didRequestNightTestingExit() {
+        let status = currentNightStatus()
+        guard case .locked(let unlockTime) = status.phase else {
+            leaveNightLock(startFreshWorkSession: true)
+            return
+        }
+
+        nightLockOverrideUntil = unlockTime
+        saveSettings()
+        leaveNightLock(startFreshWorkSession: true)
+        rebuildNightRestrictionMenu()
+    }
+}
+
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         // 如果关闭的是统计窗口，清理引用
@@ -1701,18 +2168,11 @@ extension AppDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
-        // 检查是否处于推迟状态
-        if isPostponeActive {
-            let totalSeconds = Int(postponeTimeRemaining)
-            let minutes = totalSeconds / 60
-            let secs = totalSeconds % 60
-            timerMenuItem.title = String(format: "%@: %02d:%02d (%@)", localized("screenUsage"), minutes, secs, localized("postponed"))
-        } else {
-            timerMenuItem.title = formatWorkTime(workTimeRemaining)
-        }
+        updateMenuTimer()
         updateLoginItemState()
         updateShowCountdownState()
         updateModeMenuStates()
+        rebuildNightRestrictionMenu()
         startMenuUpdateTimer()
     }
     
@@ -1751,5 +2211,6 @@ extension AppDelegate: NSMenuDelegate {
         for overlay in breakOverlays {
             overlay.setLocalizer(localized)
         }
+        refreshNightLockOverlays()
     }
 }
