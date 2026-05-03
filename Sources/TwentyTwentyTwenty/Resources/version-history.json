@@ -7,8 +7,18 @@
     "email": "javen.out@gmail.com",
     "github": "@javenfang"
   },
-  "current_version": "1.3.0",
+  "current_version": "1.3.1",
   "versions": [
+    {
+      "version": "1.3.1",
+      "date": "2026-05-03",
+      "changes": [
+        "Refined the night screen lock menu with a compact rhythm summary and testing escape submenu",
+        "Replaced the night lock dialog card with a full-screen status overlay",
+        "Reworked the eye health report around a verdict-first dashboard",
+        "Aligned the seven-day table with date, work, completion, and postpone columns"
+      ]
+    },
     {
       "version": "1.3.0",
       "date": "2026-05-03",

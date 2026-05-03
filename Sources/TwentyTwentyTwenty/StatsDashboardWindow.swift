@@ -3,6 +3,7 @@ import TwentyTwentyTwentyCore
 
 final class StatsDashboardWindow: NSWindow {
     private let statsDB = StatsDatabase.shared
+    private let verdictEvaluator = StatsHealthVerdictEvaluator()
     private var localizer: ((String) -> String)?
     private let contentStack = NSStackView()
     private let scrollView = NSScrollView()
@@ -12,7 +13,7 @@ final class StatsDashboardWindow: NSWindow {
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -40,7 +41,7 @@ final class StatsDashboardWindow: NSWindow {
 
     private func setupWindow() {
         title = "眼睛健康报告"
-        minSize = NSSize(width: 520, height: 560)
+        minSize = NSSize(width: 560, height: 560)
         isReleasedWhenClosed = false
         backgroundColor = .controlBackgroundColor
     }
@@ -151,10 +152,12 @@ final class StatsDashboardWindow: NSWindow {
     private func render(_ snapshot: StatsDashboardSnapshot) {
         clearContent()
         addContentSection(makeHeader(snapshot))
-        addContentSection(makeTodayMetrics(snapshot.today))
-        addContentSection(makeTodayDetails(snapshot.today))
-        addContentSection(makeWeekSection(snapshot.week))
-        addContentSection(makeQualitySection(snapshot.week.quality))
+        addContentSection(makeVerdictPanel(snapshot.today))
+        addContentSection(makeKeyMetrics(snapshot.today))
+        addContentSection(makeWeekTableSection(snapshot.week))
+        if snapshot.week.quality.hasIssues {
+            addContentSection(makeQualitySection(snapshot.week.quality))
+        }
         scrollToTop()
     }
 
@@ -204,43 +207,63 @@ final class StatsDashboardWindow: NSWindow {
         return container
     }
 
-    private func makeTodayMetrics(_ today: StatsDaySnapshot) -> NSView {
+    private func makeVerdictPanel(_ today: StatsDaySnapshot) -> NSView {
+        let panel = makePanel()
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 142).isActive = true
+
+        let stack = makeVerticalStack(spacing: 10, inset: 18)
+        panel.addSubview(stack)
+        pin(stack, to: panel)
+
+        let verdict = verdictEvaluator.verdict(for: today)
+        stack.addArrangedSubview(makeLabel("今日判断", size: 13, weight: .medium, color: .secondaryLabelColor))
+
+        let titleLabel = makeLabel(verdict.title, size: 32, weight: .bold, color: verdictColor(verdict.severity))
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        stack.addArrangedSubview(titleLabel)
+
+        let reasonLabel = makeLabel(verdict.reason, size: 14, weight: .medium, color: .secondaryLabelColor)
+        stack.addArrangedSubview(reasonLabel)
+
+        if today.totalWorkSeconds > 0 {
+            stack.addArrangedSubview(makeLabel(
+                "累计 \(formatDuration(today.totalWorkSeconds))，最长连续 \(formatDuration(today.longestWorkSeconds))",
+                size: 12,
+                color: .tertiaryLabelColor
+            ))
+        }
+
+        return panel
+    }
+
+    private func makeKeyMetrics(_ today: StatsDaySnapshot) -> NSView {
         let container = makeVerticalStack(spacing: 12, inset: 0)
 
-        container.addArrangedSubview(makeSectionTitle("今日概览"))
+        container.addArrangedSubview(makeSectionTitle("关键指标"))
 
-        let firstRow = makeHorizontalStack(distribution: .fillEqually)
-        firstRow.addArrangedSubview(makeMetricCard(
-            title: "有效工作",
-            value: "\(today.workSessions) 次",
-            detail: "不足 1 分钟不计入",
-            accent: .systemBlue
-        ))
-        firstRow.addArrangedSubview(makeMetricCard(
-            title: "休息完成",
-            value: "\(today.completedBreaks)/\(today.breakOpportunities)",
-            detail: "完成率 \(formatPercent(today.breakCompletionRate))",
+        let row = makeHorizontalStack(distribution: .fillEqually)
+        row.addArrangedSubview(makeMetricCard(
+            title: "完成率",
+            value: formatPercent(today.breakCompletionRate),
+            detail: "\(today.completedBreaks)/\(today.breakOpportunities) 次休息",
             accent: completionColor(today.breakCompletionRate)
         ))
-
-        let secondRow = makeHorizontalStack(distribution: .fillEqually)
-        secondRow.addArrangedSubview(makeMetricCard(
-            title: "最长连续",
-            value: formatDuration(today.longestWorkSeconds),
-            detail: longestWorkDetail(today.longestWorkSeconds),
-            accent: today.longestWorkSeconds > 90 * 60 ? .systemRed : .systemGreen
-        ))
-        secondRow.addArrangedSubview(makeMetricCard(
+        row.addArrangedSubview(makeMetricCard(
             title: "推迟",
-            value: "\(today.postponedSessions) 会话 / \(today.totalPostpones) 次",
-            detail: "推迟率 \(formatPercent(today.postponeSessionRate))",
+            value: "\(today.totalPostpones) 次",
+            detail: "\(today.postponedSessions) 个会话",
             accent: today.postponeSessionRate > 0.3 ? .systemOrange : .systemGreen
         ))
+        row.addArrangedSubview(makeMetricCard(
+            title: "夜间",
+            value: nightRestrictionEnabled() ? "已启用" : "未启用",
+            detail: "晚间收紧与禁用",
+            accent: nightRestrictionEnabled() ? .systemGreen : .secondaryLabelColor,
+            monospacedValue: false
+        ))
 
-        container.addArrangedSubview(firstRow)
-        container.addArrangedSubview(secondRow)
-        firstRow.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
-        secondRow.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
+        container.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
         return container
     }
 
@@ -259,19 +282,21 @@ final class StatsDashboardWindow: NSWindow {
         return panel
     }
 
-    private func makeWeekSection(_ week: StatsWeekSnapshot) -> NSView {
+    private func makeWeekTableSection(_ week: StatsWeekSnapshot) -> NSView {
         let panel = makePanel()
-        let stack = makeVerticalStack(spacing: 12, inset: 16)
+        let stack = makeVerticalStack(spacing: 14, inset: 16)
         panel.addSubview(stack)
         pin(stack, to: panel)
 
         stack.addArrangedSubview(makeSectionTitle("近 7 天"))
-        stack.addArrangedSubview(makeInfoRow(title: "累计工作时长", value: formatDuration(week.totalWorkSeconds)))
-        stack.addArrangedSubview(makeInfoRow(title: "健康天数", value: "\(week.healthyDays)/7 天"))
-        stack.addArrangedSubview(makeInfoRow(title: "休息完成率", value: formatPercent(week.breakCompletionRate)))
-        stack.addArrangedSubview(makeInfoRow(title: "活跃天数", value: "\(week.activeDays)/7 天"))
+        stack.addArrangedSubview(makeLabel(
+            "累计 \(formatDuration(week.totalWorkSeconds)) · 健康 \(week.healthyDays)/7 天 · 完成率 \(formatPercent(week.breakCompletionRate))",
+            size: 12,
+            color: .secondaryLabelColor
+        ))
 
-        let dayList = makeVerticalStack(spacing: 6, inset: 0)
+        let dayList = makeVerticalStack(spacing: 8, inset: 0)
+        dayList.addArrangedSubview(makeWeekHeaderRow())
         for day in week.days.reversed() {
             dayList.addArrangedSubview(makeDayRow(day))
         }
@@ -301,29 +326,58 @@ final class StatsDashboardWindow: NSWindow {
     }
 
     private func makeDayRow(_ day: StatsDaySnapshot) -> NSView {
-        let row = makeHorizontalStack(spacing: 8)
+        let row = makeHorizontalStack(spacing: 14)
         row.alignment = .centerY
 
         let dateLabel = makeLabel(formatShortDate(day.date), size: 12, weight: .medium)
         dateLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
-        dateLabel.widthAnchor.constraint(equalToConstant: 72).isActive = true
+        dateLabel.widthAnchor.constraint(equalToConstant: 68).isActive = true
 
         let workLabel = makeLabel(formatDuration(day.totalWorkSeconds), size: 12, color: .secondaryLabelColor)
         workLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        workLabel.widthAnchor.constraint(equalToConstant: 156).isActive = true
+        workLabel.widthAnchor.constraint(equalToConstant: 178).isActive = true
 
         let completionLabel = makeBadge(formatPercent(day.breakCompletionRate), color: completionColor(day.breakCompletionRate))
         completionLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         completionLabel.alignment = .right
-        completionLabel.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        completionLabel.widthAnchor.constraint(equalToConstant: 74).isActive = true
+
+        let postponeLabel = makeLabel("\(day.totalPostpones)", size: 12, weight: .semibold, color: day.totalPostpones > 0 ? .systemOrange : .secondaryLabelColor)
+        postponeLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        postponeLabel.alignment = .right
+        postponeLabel.widthAnchor.constraint(equalToConstant: 56).isActive = true
 
         row.addArrangedSubview(dateLabel)
         row.addArrangedSubview(workLabel)
         row.addArrangedSubview(completionLabel)
+        row.addArrangedSubview(postponeLabel)
         return row
     }
 
-    private func makeMetricCard(title: String, value: String, detail: String, accent: NSColor) -> NSView {
+    private func makeWeekHeaderRow() -> NSView {
+        let row = makeHorizontalStack(spacing: 14)
+        row.alignment = .centerY
+
+        let dateLabel = makeColumnHeader("日期", width: 68, alignment: .left)
+        let workLabel = makeColumnHeader("工作", width: 178, alignment: .left)
+        let completionLabel = makeColumnHeader("完成", width: 74, alignment: .right)
+        let postponeLabel = makeColumnHeader("推迟", width: 56, alignment: .right)
+
+        row.addArrangedSubview(dateLabel)
+        row.addArrangedSubview(workLabel)
+        row.addArrangedSubview(completionLabel)
+        row.addArrangedSubview(postponeLabel)
+        return row
+    }
+
+    private func makeColumnHeader(_ text: String, width: CGFloat, alignment: NSTextAlignment) -> NSTextField {
+        let label = makeLabel(text, size: 11, weight: .medium, color: .secondaryLabelColor)
+        label.alignment = alignment
+        label.widthAnchor.constraint(equalToConstant: width).isActive = true
+        return label
+    }
+
+    private func makeMetricCard(title: String, value: String, detail: String, accent: NSColor, monospacedValue: Bool = true) -> NSView {
         let card = makePanel()
         card.heightAnchor.constraint(greaterThanOrEqualToConstant: 96).isActive = true
 
@@ -333,7 +387,7 @@ final class StatsDashboardWindow: NSWindow {
 
         let titleLabel = makeLabel(title, size: 12, color: .secondaryLabelColor)
         let valueLabel = makeLabel(value, size: 22, weight: .bold)
-        valueLabel.font = .monospacedDigitSystemFont(ofSize: 22, weight: .bold)
+        valueLabel.font = monospacedValue ? .monospacedDigitSystemFont(ofSize: 22, weight: .bold) : .systemFont(ofSize: 22, weight: .bold)
         valueLabel.textColor = accent
         let detailLabel = makeLabel(detail, size: 11, color: .secondaryLabelColor)
 
@@ -473,6 +527,21 @@ final class StatsDashboardWindow: NSWindow {
         if seconds > 90 * 60 { return "明显偏长" }
         if seconds > 60 * 60 { return "需要留意" }
         return "节奏正常"
+    }
+
+    private func verdictColor(_ severity: StatsHealthVerdictSeverity) -> NSColor {
+        switch severity {
+        case .good:
+            return .systemGreen
+        case .warning:
+            return .systemOrange
+        case .neutral:
+            return .labelColor
+        }
+    }
+
+    private func nightRestrictionEnabled() -> Bool {
+        UserDefaults.standard.bool(forKey: "nightRestrictionEnabled")
     }
 
     private func completionColor(_ rate: Double) -> NSColor {

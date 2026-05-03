@@ -135,12 +135,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "about": "关于",
             "postponeLimit": "推迟上限",
             "nightRestriction": "夜间禁用",
-            "nightRestrictionEnabled": "启用夜间禁用",
+            "nightRestrictionEnabled": "启用",
             "nightWindDownStart": "收紧开始",
             "nightLockStart": "完全禁用",
             "nightUnlockTime": "恢复可用",
-            "nightRhythmToday": "今日节奏",
-            "nightTestingExit": "显示测试退出",
+            "nightRhythmToday": "今晚",
+            "nightTestingExit": "测试出口",
+            "nightTestingExitShown": "显示",
+            "nightTestingExitHidden": "隐藏",
             "nightWindDownStatus": "夜间收紧",
             "nightLockedStatus": "夜间禁用中",
             "nightDisabled": "禁用",
@@ -177,12 +179,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "about": "About",
             "postponeLimit": "Postpone Limit",
             "nightRestriction": "Night Screen Lock",
-            "nightRestrictionEnabled": "Enable Night Screen Lock",
+            "nightRestrictionEnabled": "Enable",
             "nightWindDownStart": "Wind-down Starts",
             "nightLockStart": "Full Lock Starts",
             "nightUnlockTime": "Unlocks",
-            "nightRhythmToday": "Today's Rhythm",
-            "nightTestingExit": "Show Testing Escape",
+            "nightRhythmToday": "Tonight",
+            "nightTestingExit": "Testing Escape",
+            "nightTestingExitShown": "Shown",
+            "nightTestingExitHidden": "Hidden",
             "nightWindDownStatus": "Night Wind-down",
             "nightLockedStatus": "Night Lock Active",
             "nightDisabled": "Locked",
@@ -896,9 +900,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rhythmItem.isEnabled = false
         submenu.addItem(rhythmItem)
 
-        let testingExitItem = NSMenuItem(title: localized("nightTestingExit"), action: #selector(toggleNightTestingExit), keyEquivalent: "")
-        testingExitItem.target = self
-        testingExitItem.state = nightRestrictionSettings.testingExitEnabled ? .on : .off
+        let testingExitStatus = nightRestrictionSettings.testingExitEnabled
+            ? localized("nightTestingExitShown")
+            : localized("nightTestingExitHidden")
+        let testingExitItem = NSMenuItem(title: "\(localized("nightTestingExit")): \(testingExitStatus)", action: nil, keyEquivalent: "")
+        let testingExitSubmenu = NSMenu()
+
+        let showTestingExitItem = NSMenuItem(title: localized("nightTestingExitShown"), action: #selector(selectNightTestingExitVisibility(_:)), keyEquivalent: "")
+        showTestingExitItem.target = self
+        showTestingExitItem.tag = 1
+        showTestingExitItem.state = nightRestrictionSettings.testingExitEnabled ? .on : .off
+        testingExitSubmenu.addItem(showTestingExitItem)
+
+        let hideTestingExitItem = NSMenuItem(title: localized("nightTestingExitHidden"), action: #selector(selectNightTestingExitVisibility(_:)), keyEquivalent: "")
+        hideTestingExitItem.target = self
+        hideTestingExitItem.tag = 0
+        hideTestingExitItem.state = nightRestrictionSettings.testingExitEnabled ? .off : .on
+        testingExitSubmenu.addItem(hideTestingExitItem)
+
+        testingExitItem.submenu = testingExitSubmenu
         submenu.addItem(testingExitItem)
 
         return submenu
@@ -934,8 +954,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let base = formatDurationForMenu(currentWorkDuration)
         let stages = NightRestrictionPolicy.windDownLimits(baseWorkDurationSeconds: currentWorkDuration)
             .map(formatDurationForMenu)
-            .joined(separator: " → ")
-        return "\(localized("nightRhythmToday")): \(base) → \(stages) → \(localized("nightDisabled"))"
+            .joined(separator: " -> ")
+        return "\(localized("nightRhythmToday")): \(base) -> \(stages) -> \(localized("nightDisabled"))"
     }
 
     private func formatDurationForMenu(_ seconds: Int) -> String {
@@ -982,8 +1002,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusBarTitle()
     }
 
-    @objc private func toggleNightTestingExit() {
-        nightRestrictionSettings.testingExitEnabled.toggle()
+    @objc private func selectNightTestingExitVisibility(_ sender: NSMenuItem) {
+        nightRestrictionSettings.testingExitEnabled = sender.tag == 1
         saveSettings()
         rebuildNightRestrictionMenu()
         refreshNightLockOverlays()
@@ -1730,7 +1750,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func nightScheduleText(_ schedule: NightRestrictionSchedule) -> String {
-        "\(schedule.windDownStartTime.displayString) \(localized("nightWindDownStart")) · \(schedule.lockStartTime.displayString) \(localized("nightLockStart")) · \(schedule.unlockClockTime.displayString) \(localized("nightUnlockTime"))"
+        "\(schedule.windDownStartTime.displayString) \(localized("nightWindDownStart")) - \(schedule.lockStartTime.displayString) \(localized("nightDisabled"))"
     }
 
     private func nightWindDownHint(for status: NightRestrictionStatus) -> String? {

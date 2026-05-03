@@ -40,59 +40,53 @@ final class NightRestrictionOverlayWindow: NSWindow {
     private func setupUI() {
         guard let contentView else { return }
 
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.96).cgColor
-        container.layer?.cornerRadius = 18
-        contentView.addSubview(container)
+        titleLabel = makeLabel("夜间禁用", size: 18, weight: .medium, color: .secondaryLabelColor)
+        subtitleLabel = makeLabel("屏幕已禁用", size: 44, weight: .semibold, color: .labelColor)
+        countdownLabel = makeLabel("00:00:00", size: 86, weight: .bold, color: .labelColor, monospaced: true)
+        recoveryLabel = makeLabel("", size: 22, weight: .semibold, color: .labelColor)
+        scheduleLabel = makeLabel("", size: 15, weight: .regular, color: .secondaryLabelColor)
 
-        titleLabel = makeLabel("夜间屏幕禁用中", size: 34, weight: .semibold, color: .labelColor)
-        subtitleLabel = makeLabel("现在不建议继续使用屏幕。", size: 18, weight: .regular, color: .secondaryLabelColor)
-        countdownLabel = makeLabel("00:00:00", size: 62, weight: .bold, color: .systemIndigo, monospaced: true)
-        recoveryLabel = makeLabel("", size: 20, weight: .medium, color: .labelColor)
-        scheduleLabel = makeLabel("", size: 14, weight: .regular, color: .secondaryLabelColor)
-
-        testingExitButton = NSButton(title: "测试退出", target: self, action: #selector(testingExitClicked))
-        testingExitButton.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        testingExitButton.bezelStyle = .rounded
+        testingExitButton = NSButton(title: "测试出口", target: self, action: #selector(testingExitClicked))
+        testingExitButton.font = NSFont.systemFont(ofSize: 11, weight: .regular)
+        testingExitButton.bezelStyle = .inline
         testingExitButton.translatesAutoresizingMaskIntoConstraints = false
+        testingExitButton.contentTintColor = .secondaryLabelColor
 
         for view in [titleLabel!, subtitleLabel!, countdownLabel!, recoveryLabel!, scheduleLabel!] {
-            container.addSubview(view)
+            contentView.addSubview(view)
         }
         contentView.addSubview(testingExitButton)
 
         NSLayoutConstraint.activate([
-            container.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            container.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            container.widthAnchor.constraint(equalToConstant: 560),
-            container.heightAnchor.constraint(equalToConstant: 360),
+            countdownLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            countdownLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -10),
+            countdownLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 56),
+            countdownLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -56),
 
-            titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 40),
-            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
-            titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
+            subtitleLabel.bottomAnchor.constraint(equalTo: countdownLabel.topAnchor, constant: -34),
+            subtitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 56),
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -56),
+            subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
-            subtitleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
-            subtitleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
+            titleLabel.bottomAnchor.constraint(equalTo: subtitleLabel.topAnchor, constant: -12),
+            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 56),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -56),
+            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            countdownLabel.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 32),
-            countdownLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
-            countdownLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
+            recoveryLabel.topAnchor.constraint(equalTo: countdownLabel.bottomAnchor, constant: 38),
+            recoveryLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 56),
+            recoveryLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -56),
+            recoveryLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            recoveryLabel.topAnchor.constraint(equalTo: countdownLabel.bottomAnchor, constant: 28),
-            recoveryLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
-            recoveryLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
+            scheduleLabel.topAnchor.constraint(equalTo: recoveryLabel.bottomAnchor, constant: 18),
+            scheduleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 56),
+            scheduleLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -56),
+            scheduleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            scheduleLabel.topAnchor.constraint(equalTo: recoveryLabel.bottomAnchor, constant: 14),
-            scheduleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
-            scheduleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
-
-            testingExitButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            testingExitButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
-            testingExitButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 76),
-            testingExitButton.heightAnchor.constraint(equalToConstant: 30)
+            testingExitButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -22),
+            testingExitButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -18),
+            testingExitButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 68),
+            testingExitButton.heightAnchor.constraint(equalToConstant: 24)
         ])
     }
 
@@ -118,7 +112,7 @@ final class NightRestrictionOverlayWindow: NSWindow {
     func update(unlockTime: Date, now: Date) {
         let remaining = max(0, Int(unlockTime.timeIntervalSince(now)))
         countdownLabel.stringValue = formatRemaining(remaining)
-        recoveryLabel.stringValue = "\(formatClock(unlockTime)) 自动恢复"
+        recoveryLabel.stringValue = "\(formatClock(unlockTime)) 恢复使用"
     }
 
     func showOverlay() {
@@ -162,7 +156,7 @@ final class NightRestrictionOverlayWindow: NSWindow {
 
     private func resetTestingExitConfirmation() {
         isConfirmingTestingExit = false
-        testingExitButton?.title = "测试退出"
+        testingExitButton?.title = "测试出口"
         confirmationTimer?.invalidate()
         confirmationTimer = nil
     }
