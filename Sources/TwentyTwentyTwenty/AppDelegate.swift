@@ -143,6 +143,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "nightTestingExit": "测试出口",
             "nightTestingExitShown": "显示",
             "nightTestingExitHidden": "隐藏",
+            "nightRhythmCurrent": "当前",
+            "nightRhythmStage": "收紧",
+            "nightRhythmLockedAfter": "完全禁用后",
             "nightWindDownStatus": "夜间收紧",
             "nightLockedStatus": "夜间禁用中",
             "nightDisabled": "禁用",
@@ -187,6 +190,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "nightTestingExit": "Testing Escape",
             "nightTestingExitShown": "Shown",
             "nightTestingExitHidden": "Hidden",
+            "nightRhythmCurrent": "Current",
+            "nightRhythmStage": "Wind-down",
+            "nightRhythmLockedAfter": "After Full Lock",
             "nightWindDownStatus": "Night Wind-down",
             "nightLockedStatus": "Night Lock Active",
             "nightDisabled": "Locked",
@@ -577,6 +583,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         setupModeMenu()
+        setupNightRestrictionMenu()
         
         menu.addItem(NSMenuItem.separator())
         
@@ -618,8 +625,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateShowCountdownState()
         menu.addItem(showCountdownMenuItem)
 
-        setupNightRestrictionMenu()
-        
         menu.addItem(NSMenuItem.separator())
 
         let aboutItem = NSMenuItem(title: localized("about"), action: #selector(showAbout), keyEquivalent: "")
@@ -896,8 +901,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         submenu.addItem(NSMenuItem.separator())
 
-        let rhythmItem = NSMenuItem(title: nightRhythmSummary(), action: nil, keyEquivalent: "")
-        rhythmItem.isEnabled = false
+        let rhythmItem = NSMenuItem(title: nightRhythmSummaryTitle(), action: nil, keyEquivalent: "")
+        rhythmItem.submenu = buildNightRhythmSubmenu()
         submenu.addItem(rhythmItem)
 
         let testingExitStatus = nightRestrictionSettings.testingExitEnabled
@@ -950,12 +955,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func nightRhythmSummary() -> String {
+    private func nightRhythmSummaryTitle() -> String {
+        let base = formatDurationForMenu(currentWorkDuration)
+        return "\(localized("nightRhythmToday")): \(base) -> \(localized("nightDisabled"))"
+    }
+
+    private func buildNightRhythmSubmenu() -> NSMenu {
+        let submenu = NSMenu()
         let base = formatDurationForMenu(currentWorkDuration)
         let stages = NightRestrictionPolicy.windDownLimits(baseWorkDurationSeconds: currentWorkDuration)
             .map(formatDurationForMenu)
-            .joined(separator: " -> ")
-        return "\(localized("nightRhythmToday")): \(base) -> \(stages) -> \(localized("nightDisabled"))"
+
+        submenu.addItem(disabledMenuItem("\(localized("nightRhythmCurrent")): \(base)"))
+        submenu.addItem(NSMenuItem.separator())
+
+        for (index, stage) in stages.enumerated() {
+            submenu.addItem(disabledMenuItem("\(localized("nightRhythmStage")) \(index + 1): \(stage)"))
+        }
+
+        submenu.addItem(NSMenuItem.separator())
+        submenu.addItem(disabledMenuItem("\(localized("nightRhythmLockedAfter")): \(localized("nightDisabled"))"))
+        return submenu
+    }
+
+    private func disabledMenuItem(_ title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
     }
 
     private func formatDurationForMenu(_ seconds: Int) -> String {
