@@ -31,3 +31,4 @@ Package.resolved
 *.tmp
 *.swp
 *~
+.superpowers/
