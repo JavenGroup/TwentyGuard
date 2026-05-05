@@ -1,7 +1,7 @@
 # TwentyGuard - 功能需求文档
 
-> **文档版本**: v1.4.0
-> **最后更新**: 2026-05-03
+> **文档版本**: v1.5.0
+> **最后更新**: 2026-05-05
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -143,7 +143,7 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 #### 2.4.2 会话管理
 - **会话保存**
   - 每10秒自动保存当前状态
-  - 保存位置：~/Library/Application Support/com.twentytwentytwenty/
+  - 保存位置：~/Library/Application Support/com.javengroup.twentyguard/
   - 保存内容：工作/休息开始时间、模式设置、推迟状态
 
 - **会话恢复**
@@ -201,13 +201,13 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
   - 会话详细记录（开始/结束时间、时长、推迟次数等）
   - 每日汇总统计
   - 数据保留90天
-  - 位置：~/Library/Application Support/com.twentytwentytwenty/20_20_20_stats.db
+  - 位置：~/Library/Application Support/com.javengroup.twentyguard/twentyguard_stats.db
 
 - **JSONL日志**（调试用）
   - 所有事件的时间戳记录
   - 按日期分文件存储
   - 保留30天
-  - 位置：~/Library/Application Support/com.twentytwentytwenty/logs/
+  - 位置：~/Library/Application Support/com.javengroup.twentyguard/logs/
 
 ## 3. 技术规格
 
@@ -351,12 +351,20 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 ### 8.1 应用信息
 - **Bundle ID**: com.javengroup.twentyguard
 - **应用名称**: TwentyGuard
-- **版本**: 1.4.0
+- **版本**: 1.5.0
 - **大小**: 约952KB
 
 ### 8.2 分发方式
-- 直接分发（Developer ID签名）
+- 直接分发（Developer ID签名 + Apple notarization 公证）
 - Mac App Store（需要调整权限和沙盒）
+
+直接下载版本的用户体验目标是：下载安装 DMG 后拖入 Applications，并能被
+Gatekeeper 正常放行。开发用 `make dmg` 产物不能作为公开发布产物；公开发布
+必须使用 `make release` 生成签名、公证并 staple 后的 DMG。
+
+v1.5.0 已完成直接分发验证：`TwentyGuard-v1.5.0.dmg` 使用
+`Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)` 的 Developer ID
+签名，通过 Apple notarization，并被 Gatekeeper 接受。
 
 ---
 
@@ -368,8 +376,9 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 | v1.1.0 | 2025-10-31 | 推迟机制重构：累计时长限制、动态按钮禁用、实时状态反馈 |
 | v1.2.0 | 2026-04-26 | 默认推迟上限调整为 5 分钟，自定义模式支持 5/10 分钟推迟上限 |
 | v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，并补充夜间禁用能力 |
+| v1.5.0 | 2026-05-05 | SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版统计数据不迁移；发布签名公证 DMG |
 
 ---
 
-*文档最后更新：2026-05-03*
+*文档最后更新：2026-05-05*
 *文档维护者：Javen Fang (@javenfang)*

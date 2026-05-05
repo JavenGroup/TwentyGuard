@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![TwentyGuard status bar icon](Sources/TwentyTwentyTwenty/Resources/statusbar_icon@2x.png)
+![TwentyGuard status bar icon](Sources/TwentyGuard/Resources/statusbar_icon@2x.png)
 
 **Strict 20-20-20 breaks for macOS.**
 
@@ -36,14 +36,21 @@ at night when you need a real boundary.
 
 ## Installation
 
-1. Download the latest `TwentyGuard-vX.Y.Z.dmg` from
+1. Download the latest `TwentyGuard-v1.5.0.dmg` from
    [Releases](https://github.com/JavenGroup/TwentyGuard/releases).
 2. Open the DMG.
 3. Drag `TwentyGuard.app` into `Applications`.
 4. Launch TwentyGuard from Applications.
 
-Unsigned builds may require right-clicking the app and choosing **Open** on the
-first launch.
+The v1.5.0 DMG is Developer ID signed, Apple-notarized, and accepted by
+Gatekeeper. SHA-256:
+
+```text
+8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88
+```
+
+Local builds created from source may require right-clicking the app and choosing
+**Open** on the first launch.
 
 ## Usage
 
@@ -77,10 +84,19 @@ make install
 make launch
 ```
 
-Create a DMG:
+Create a local DMG:
 
 ```bash
 make dmg
+```
+
+Create a public release DMG after installing a Developer ID Application
+certificate and storing notarization credentials:
+
+```bash
+make release \
+  TEAM_ID=<team-id> \
+  DEVELOPER_ID_APPLICATION="Developer ID Application: <name> (<team-id>)"
 ```
 
 ## Project Structure
@@ -88,8 +104,8 @@ make dmg
 ```text
 TwentyGuard/
 ├── Sources/
-│   ├── TwentyTwentyTwenty/       # macOS app target
-│   └── TwentyTwentyTwentyCore/   # shared policy and statistics logic
+│   ├── TwentyGuard/       # macOS app target
+│   └── TwentyGuardCore/   # shared policy and statistics logic
 ├── docs/                         # product and technical notes
 ├── marketing/                    # launch positioning and public copy drafts
 ├── scripts/                      # release helpers
@@ -98,9 +114,8 @@ TwentyGuard/
 └── Package.swift
 ```
 
-The internal Swift target names still use the original project name. Public
-branding, bundle metadata, build output, install path, and release assets use
-TwentyGuard.
+The Swift package, targets, executable, bundle metadata, build output, install
+path, and release assets all use the TwentyGuard name.
 
 ## Privacy
 

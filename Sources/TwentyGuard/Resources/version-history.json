@@ -7,8 +7,19 @@
     "email": "javen.out@gmail.com",
     "github": "JavenGroup/TwentyGuard"
   },
-  "current_version": "1.4.0",
+  "current_version": "1.5.0",
   "versions": [
+    {
+      "version": "1.5.0",
+      "date": "2026-05-05",
+      "changes": [
+        "Renamed internal SwiftPM package targets and executable to TwentyGuard",
+        "Reset local statistics and session storage to the TwentyGuard application support path",
+        "Removed legacy 20-20-20 settings and data migration paths",
+        "Renamed the statistics database to twentyguard_stats.db",
+        "Published a Developer ID signed and Apple-notarized DMG for direct download"
+      ]
+    },
     {
       "version": "1.4.0",
       "date": "2026-05-03",

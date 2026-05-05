@@ -1,5 +1,5 @@
 import Cocoa
-import TwentyTwentyTwentyCore
+import TwentyGuardCore
 
 final class StatsDashboardWindow: NSWindow {
     private let statsDB = StatsDatabase.shared

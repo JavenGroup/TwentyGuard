@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # TwentyGuard DMG Creation Script
-# Creates a professional DMG file for distribution
+# Creates a DMG container. The Makefile release target handles Developer ID
+# signing, notarization, and stapling for public distribution.
 
 set -e
 
@@ -9,7 +10,7 @@ set -e
 APP_NAME="TwentyGuard"
 APP_PATH="./build/${APP_NAME}.app"
 DMG_NAME="TwentyGuard"
-VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist 2>/dev/null || echo "1.4.0")
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist 2>/dev/null || echo "1.5.0")
 DMG_BACKGROUND_IMG="dmg_background.png"
 DMG_WINDOW_X=200
 DMG_WINDOW_Y=120
@@ -107,5 +108,5 @@ echo "✅ DMG created successfully!"
 echo "📍 Location: ${FINAL_DMG}"
 echo "📦 Size: $(du -h "${FINAL_DMG}" | cut -f1)"
 echo ""
-echo "🚀 Ready for distribution!"
-echo "   You can now upload this DMG to GitHub Releases"
+echo "ℹ️  Local DMG packaging complete."
+echo "   For public releases, use the Makefile release target to sign and notarize."

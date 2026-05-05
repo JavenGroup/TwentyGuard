@@ -1,5 +1,5 @@
 import XCTest
-@testable import TwentyTwentyTwentyCore
+@testable import TwentyGuardCore
 
 final class NightRestrictionPolicyTests: XCTestCase {
     private var calendar: Calendar {

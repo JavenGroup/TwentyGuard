@@ -2,35 +2,35 @@
 import PackageDescription
 
 let package = Package(
-    name: "TwentyTwentyTwenty",
+    name: "TwentyGuard",
     platforms: [
         .macOS(.v12)
     ],
     products: [
         .library(
-            name: "TwentyTwentyTwentyCore",
-            targets: ["TwentyTwentyTwentyCore"]
+            name: "TwentyGuardCore",
+            targets: ["TwentyGuardCore"]
         ),
         .executable(
-            name: "TwentyTwentyTwenty",
-            targets: ["TwentyTwentyTwenty"]
+            name: "TwentyGuard",
+            targets: ["TwentyGuard"]
         ),
     ],
     targets: [
         .target(
-            name: "TwentyTwentyTwentyCore",
+            name: "TwentyGuardCore",
             dependencies: []
         ),
         .executableTarget(
-            name: "TwentyTwentyTwenty",
-            dependencies: ["TwentyTwentyTwentyCore"],
+            name: "TwentyGuard",
+            dependencies: ["TwentyGuardCore"],
             resources: [
                 .copy("Resources")
             ]
         ),
         .testTarget(
-            name: "TwentyTwentyTwentyCoreTests",
-            dependencies: ["TwentyTwentyTwentyCore"]
+            name: "TwentyGuardCoreTests",
+            dependencies: ["TwentyGuardCore"]
         ),
     ]
 )

@@ -1,7 +1,7 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.4.0
-> **最后更新**: 2026-05-03
+> **文档版本**: v1.5.0
+> **最后更新**: 2026-05-05
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -89,7 +89,7 @@ graph TB
 ### 1.3 项目结构
 
 ```
-Sources/TwentyTwentyTwenty/
+Sources/TwentyGuard/
 ├── main.swift                    # 入口点
 ├── AppDelegate.swift             # 主控制器 (1573行)
 ├── BreakOverlayWindow.swift      # 全屏休息窗口 (477行)
@@ -109,7 +109,7 @@ Sources/TwentyTwentyTwenty/
 
 ### 2.1 AppDelegate - 主控制器
 
-**文件**: [`AppDelegate.swift`](../Sources/TwentyTwentyTwenty/AppDelegate.swift)
+**文件**: [`AppDelegate.swift`](../Sources/TwentyGuard/AppDelegate.swift)
 
 **职责**:
 - 应用生命周期管理
@@ -124,11 +124,11 @@ Sources/TwentyTwentyTwenty/
 - 通过计算属性实时计算剩余时间（避免累积误差）
 - ⭐ v1.2.0 更新：默认模式推迟总计最多 5 分钟，自定义模式可选 5/10 分钟
 
-📖 **详细实现**: [`AppDelegate.swift:54-86`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L54-L86)
+📖 **详细实现**: [`AppDelegate.swift:54-86`](../Sources/TwentyGuard/AppDelegate.swift#L54-L86)
 
 ### 2.2 BreakOverlayWindow - 休息提醒窗口
 
-**文件**: [`BreakOverlayWindow.swift`](../Sources/TwentyTwentyTwenty/BreakOverlayWindow.swift)
+**文件**: [`BreakOverlayWindow.swift`](../Sources/TwentyGuard/BreakOverlayWindow.swift)
 
 **职责**:
 - 全屏模态窗口显示
@@ -143,13 +143,13 @@ Sources/TwentyTwentyTwenty/
 - 支持多显示器（每个屏幕一个窗口实例）
 - ⭐ v1.1.0 更新：底部显示推迟状态（已推迟X分钟，剩余Y分钟）
 - ⭐ v1.1.0 更新：根据剩余时间动态禁用推迟按钮
-- 使用网格布局实现冒号对齐 ([`BreakOverlayWindow.swift:98-180`](../Sources/TwentyTwentyTwenty/BreakOverlayWindow.swift#L98-L180))
-- 全局键盘事件监听，无需窗口焦点 ([`BreakOverlayWindow.swift:310-332`](../Sources/TwentyTwentyTwenty/BreakOverlayWindow.swift#L310-L332))
+- 使用网格布局实现冒号对齐 ([`BreakOverlayWindow.swift:98-180`](../Sources/TwentyGuard/BreakOverlayWindow.swift#L98-L180))
+- 全局键盘事件监听，无需窗口焦点 ([`BreakOverlayWindow.swift:310-332`](../Sources/TwentyGuard/BreakOverlayWindow.swift#L310-L332))
 - 通过委托模式通知 AppDelegate 处理推迟请求
 
 ### 2.3 EventRecorder - 事件记录器
 
-**文件**: [`EventRecorder.swift`](../Sources/TwentyTwentyTwenty/EventRecorder.swift)
+**文件**: [`EventRecorder.swift`](../Sources/TwentyGuard/EventRecorder.swift)
 
 **职责**:
 - 统一事件记录入口
@@ -179,7 +179,7 @@ graph LR
 
 ### 2.4 StatsDatabase - SQLite存储
 
-**文件**: [`StatsDatabase.swift`](../Sources/TwentyTwentyTwenty/StatsDatabase.swift)
+**文件**: [`StatsDatabase.swift`](../Sources/TwentyGuard/StatsDatabase.swift)
 
 **职责**:
 - 会话数据持久化
@@ -223,12 +223,12 @@ CREATE TABLE daily_stats (
 
 **数据库文件位置**:
 ```
-~/Library/Application Support/com.twentytwentytwenty/20_20_20_stats.db
+~/Library/Application Support/com.javengroup.twentyguard/twentyguard_stats.db
 ```
 
 ### 2.5 LogManager - JSON日志
 
-**文件**: [`LogManager.swift`](../Sources/TwentyTwentyTwenty/LogManager.swift)
+**文件**: [`LogManager.swift`](../Sources/TwentyGuard/LogManager.swift)
 
 **职责**:
 - 结构化日志记录 (JSONL格式)
@@ -237,13 +237,13 @@ CREATE TABLE daily_stats (
 
 **日志文件位置**:
 ```
-~/Library/Application Support/com.twentytwentytwenty/logs/
+~/Library/Application Support/com.javengroup.twentyguard/logs/
 ├── 2025-10-31.jsonl       # 每日日志
 ├── 2025-10-30.jsonl
 └── current_session.json   # 当前会话状态
 ```
 
-**日志事件类型** ([`LogManager.swift:11-38`](../Sources/TwentyTwentyTwenty/LogManager.swift#L11-L38)):
+**日志事件类型** ([`LogManager.swift:11-38`](../Sources/TwentyGuard/LogManager.swift#L11-L38)):
 - 工作/休息周期: `work_started`, `work_completed`, `break_started`, etc.
 - 系统事件: `system_sleep`, `screensaver_start`, etc.
 - 应用事件: `app_launched`, `settings_changed`, etc.
@@ -269,20 +269,20 @@ stateDiagram-v2
 ```
 
 **状态转换代码路径**:
-1. **启动** → `applicationDidFinishLaunching` ([`AppDelegate.swift:233`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L233))
+1. **启动** → `applicationDidFinishLaunching` ([`AppDelegate.swift:233`](../Sources/TwentyGuard/AppDelegate.swift#L233))
    - 尝试恢复会话 (`restoreSessionIfNeeded`)
    - 失败则启动新工作会话 (`startWorkTimer`)
 
-2. **工作完成** → `completeWorkSession` ([`AppDelegate.swift:1005`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1005))
+2. **工作完成** → `completeWorkSession` ([`AppDelegate.swift:1005`](../Sources/TwentyGuard/AppDelegate.swift#L1005))
    - 记录工作时长
    - 显示休息窗口 (`showBreakOverlay`)
 
-3. **休息完成** → `completeBreakSession` ([`AppDelegate.swift:1258`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1258))
+3. **休息完成** → `completeBreakSession` ([`AppDelegate.swift:1258`](../Sources/TwentyGuard/AppDelegate.swift#L1258))
    - 清理休息窗口
    - 重置推迟次数
    - 启动新工作会话
 
-4. **推迟请求** → `postponeBreak` ([`AppDelegate.swift:1301`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1301))
+4. **推迟请求** → `postponeBreak` ([`AppDelegate.swift:1301`](../Sources/TwentyGuard/AppDelegate.swift#L1301))
    - 清理休息窗口
    - 设置推迟计时器
    - 推迟时间到后重新显示休息窗口
@@ -291,7 +291,7 @@ stateDiagram-v2
 
 **问题**: 计时器可能在短时间内多次触发完成逻辑
 
-**解决方案**: 使用布尔标志防止重入 ([`AppDelegate.swift:48-50`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L48-L50))
+**解决方案**: 使用布尔标志防止重入 ([`AppDelegate.swift:48-50`](../Sources/TwentyGuard/AppDelegate.swift#L48-L50))
 - `isCompletingWorkSession` / `isCompletingBreakSession` 标志
 - 进入完成逻辑前检查标志，执行中设置为 `true`，完成后重置为 `false`
 
@@ -299,7 +299,7 @@ stateDiagram-v2
 
 **问题**: 用户可能有多个显示器，需要在所有屏幕上显示休息窗口
 
-**解决方案** ([`AppDelegate.swift:1164-1224`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1164-L1224)):
+**解决方案** ([`AppDelegate.swift:1164-1224`](../Sources/TwentyGuard/AppDelegate.swift#L1164-L1224)):
 - 遍历 `NSScreen.screens`，为每个屏幕创建独立窗口实例
 - 所有窗口共享同一个委托，任一窗口的推迟按钮被点击 → 清理所有窗口
 - 使用 `cleanupBreakOverlays()` 统一清理，防止窗口残留
@@ -319,7 +319,7 @@ stateDiagram-v2
 
 **核心思想**: 记录 `workSessionStartTime: Date?`，通过 `Date().timeIntervalSince(startTime)` 计算已用时间，剩余时间 = 总时长 - 已用时间。
 
-📖 **代码实现**: [`AppDelegate.swift:54-68`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L54-L68)
+📖 **代码实现**: [`AppDelegate.swift:54-68`](../Sources/TwentyGuard/AppDelegate.swift#L54-L68)
 
 ### 4.2 计时器调度策略
 
@@ -331,11 +331,11 @@ stateDiagram-v2
 **启动时机**:
 - `workTimer`: `startWorkTimer()` / `restartWorkTimer()`
 - `breakTimer`: `startBreakTimer()`
-- `stateSnapshotTimer`: 应用启动时 ([`AppDelegate.swift:261`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L261))
+- `stateSnapshotTimer`: 应用启动时 ([`AppDelegate.swift:261`](../Sources/TwentyGuard/AppDelegate.swift#L261))
 
 **停止时机**:
 - 会话完成时立即停止对应计时器
-- 应用退出时停止所有计时器 ([`AppDelegate.swift:850-853`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L850-L853))
+- 应用退出时停止所有计时器 ([`AppDelegate.swift:850-853`](../Sources/TwentyGuard/AppDelegate.swift#L850-L853))
 
 ### 4.3 推迟逻辑 ⭐ v1.1.0 更新
 
@@ -359,9 +359,9 @@ stateDiagram-v2
 - **自动重置**: 完成休息后 `totalPostponedTime` 重置为 0
 
 **核心代码路径**:
-- 推迟请求处理: [`AppDelegate.swift:1301-1356`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1301-L1356)
+- 推迟请求处理: [`AppDelegate.swift:1301-1356`](../Sources/TwentyGuard/AppDelegate.swift#L1301-L1356)
 - UI状态更新: `updateBreakOverlaysPostponeStatus()`
-- 窗口状态更新: [`BreakOverlayWindow.swift:updatePostponeStatus()`](../Sources/TwentyTwentyTwenty/BreakOverlayWindow.swift)
+- 窗口状态更新: [`BreakOverlayWindow.swift:updatePostponeStatus()`](../Sources/TwentyGuard/BreakOverlayWindow.swift)
 
 ---
 
@@ -369,7 +369,7 @@ stateDiagram-v2
 
 ### 5.1 系统事件监听
 
-**监听的系统通知** ([`AppDelegate.swift:538-600`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L538-L600)):
+**监听的系统通知** ([`AppDelegate.swift:538-600`](../Sources/TwentyGuard/AppDelegate.swift#L538-L600)):
 
 **NSWorkspace 通知**:
 - 系统睡眠/唤醒: `willSleepNotification`, `didWakeNotification`
@@ -383,7 +383,7 @@ stateDiagram-v2
 
 **核心原则**: 屏保/睡眠本身相当于休息，唤醒后应开始新的工作会话
 
-**处理策略** ([`AppDelegate.swift:1423-1501`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1423-L1501)):
+**处理策略** ([`AppDelegate.swift:1423-1501`](../Sources/TwentyGuard/AppDelegate.swift#L1423-L1501)):
 
 1. **屏保/睡眠/显示器睡眠** → 清理休息窗口 + 重置为新工作会话（用户已得到休息）
 2. **屏幕锁定/解锁** → 根据时长决定：
@@ -395,7 +395,7 @@ stateDiagram-v2
 
 **问题**: 防止用户同时运行多个应用实例
 
-**解决方案** ([`AppDelegate.swift:264-306`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L264-L306)):
+**解决方案** ([`AppDelegate.swift:264-306`](../Sources/TwentyGuard/AppDelegate.swift#L264-L306)):
 - 通过 `NSWorkspace.shared.runningApplications` 查找相同可执行路径的其他进程
 - 如果发现已有实例运行 → 激活现有实例 + 当前实例退出
 - 比较依据: 可执行文件路径 或 Bundle ID
@@ -425,7 +425,7 @@ graph TB
 
 ### 6.2 UserDefaults - 用户设置
 
-**存储内容** ([`AppDelegate.swift:390-433`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L390-L433)):
+**存储内容** ([`AppDelegate.swift:390-433`](../Sources/TwentyGuard/AppDelegate.swift#L390-L433)):
 - `showCountdownInStatusBar`: 是否显示倒计时
 - `isCustomMode`: 是否自定义模式
 - `customWorkDuration` / `customBreakDuration`: 自定义时长
@@ -436,7 +436,7 @@ graph TB
 
 ### 6.3 SessionState - 会话状态
 
-**数据结构** ([`LogManager.swift:41-60`](../Sources/TwentyTwentyTwenty/LogManager.swift#L41-L60)):
+**数据结构** ([`LogManager.swift:41-60`](../Sources/TwentyGuard/LogManager.swift#L41-L60)):
 - `workStartTime` / `breakStartTime`: 会话开始时间
 - `currentWorkDuration` / `currentBreakDuration`: 当前时长设置
 - `pausedBySystemEvent`: 是否因系统事件暂停
@@ -446,7 +446,7 @@ graph TB
 - 每 10 秒自动快照 (`stateSnapshotTimer`)
 - 会话状态变更时、系统事件发生时
 
-**恢复逻辑** ([`AppDelegate.swift:308-380`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L308-L380)):
+**恢复逻辑** ([`AppDelegate.swift:308-380`](../Sources/TwentyGuard/AppDelegate.swift#L308-L380)):
 - 验证会话有效性（时间 < 30分钟，且非系统事件暂停）
 - 恢复 `workSessionStartTime` 继续会话，或启动新会话
 
@@ -456,8 +456,8 @@ graph TB
 **JSONL**: 调试日志，30天保留期
 
 **数据清理**:
-- SQLite: 应用启动时清理 ([`EventRecorder.swift:131`](../Sources/TwentyTwentyTwenty/EventRecorder.swift#L131))
-- JSONL: 后台异步清理 ([`LogManager.swift:183-187`](../Sources/TwentyTwentyTwenty/LogManager.swift#L183-L187))
+- SQLite: 应用启动时清理 ([`EventRecorder.swift:131`](../Sources/TwentyGuard/EventRecorder.swift#L131))
+- JSONL: 后台异步清理 ([`LogManager.swift:183-187`](../Sources/TwentyGuard/LogManager.swift#L183-L187))
 
 ---
 
@@ -473,19 +473,19 @@ graph TB
 
 ### 7.2 实现方式
 
-**字典式本地化** ([`AppDelegate.swift:91-226`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L91-L226)):
+**字典式本地化** ([`AppDelegate.swift:91-226`](../Sources/TwentyGuard/AppDelegate.swift#L91-L226)):
 - 使用嵌套字典 `[语言代码: [键: 翻译]]` 存储所有翻译
 - `localized(_ key:)` 方法：当前语言 → 中文兜底 → key 原样返回
 - 所有 UI 文本通过 `localized()` 动态获取
 
 ### 7.3 语言切换
 
-**自动检测** ([`AppDelegate.swift:398-413`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L398-L413)):
+**自动检测** ([`AppDelegate.swift:398-413`](../Sources/TwentyGuard/AppDelegate.swift#L398-L413)):
 - 优先使用保存的语言设置
 - 否则根据 `Locale.preferredLanguages.first` 自动选择
 - 匹配规则: `zh-Hans` → 简体中文, `en` → English, 等
 
-**运行时切换** ([`AppDelegate.swift:1553-1572`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1553-L1572)):
+**运行时切换** ([`AppDelegate.swift:1553-1572`](../Sources/TwentyGuard/AppDelegate.swift#L1553-L1572)):
 - 保存新语言 → 重建菜单 → 更新休息窗口文本
 - 无需重启应用，立即生效
 
@@ -520,15 +520,45 @@ make clean        # 清理构建产物
 
 ### 8.3 应用签名
 
+`make build-app` 使用 ad-hoc 签名，只适合本机开发、测试和安装到 `/Applications`。
+公开直接下载版本必须使用 Apple Developer Program 的 **Developer ID Application**
+证书签名，并通过 Apple notarization 公证。
+
 **Info.plist配置**:
 ```xml
 <key>CFBundleIdentifier</key>
 <string>com.javengroup.twentyguard</string>
 <key>CFBundleVersion</key>
-<string>1.4.0</string>
+<string>1.5.0</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
+
+**公开发布流程**:
+```bash
+# 一次性保存公证凭据，命令会安全提示输入 app-specific password
+make notary-store-credentials APPLE_ID=<apple-id-email> TEAM_ID=<team-id>
+
+# 每次发布
+make release \
+  TEAM_ID=<team-id> \
+  DEVELOPER_ID_APPLICATION="Developer ID Application: <name> (<team-id>)"
+```
+
+`make release` 会执行：
+1. 构建 `build/TwentyGuard.app`
+2. 使用 hardened runtime 和 timestamp 重新签名 app
+3. 创建并签名 `dist/TwentyGuard-v<version>.dmg`
+4. 提交 Apple notarization
+5. stapler 写入公证票据
+6. 使用 `codesign`、`spctl` 和 `stapler validate` 验证发布产物
+
+**v1.5.0 发布验证结果**:
+- Developer ID: `Developer ID Application: Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)`
+- Notary submission: `51800058-d1df-4e2b-a082-78723996cbf6`
+- Gatekeeper: `accepted`, source `Notarized Developer ID`
+- 发布产物: `dist/TwentyGuard-v1.5.0.dmg`
+- SHA-256: `8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88`
 
 ### 8.4 版本管理
 
@@ -540,7 +570,7 @@ make clean        # 清理构建产物
 make build-app && make install
 
 # 验证版本
-ps aux | grep TwentyTwentyTwenty
+ps aux | grep TwentyGuard
 
 # 确保只有一个进程在运行
 make install  # 自动终止旧进程
@@ -615,7 +645,7 @@ make install  # 自动终止旧进程
 **排查**:
 ```bash
 # 检查进程
-ps aux | grep 20-20-20
+ps aux | grep TwentyGuard
 
 # 查看可执行文件路径
 lsof -p <PID> | grep TwentyGuard.app
@@ -631,12 +661,12 @@ make install
 **验证**:
 ```bash
 # 查看会话状态文件
-cat ~/Library/Application\ Support/com.twentytwentytwenty/current_session.json
+cat ~/Library/Application\ Support/com.javengroup.twentyguard/current_session.json
 
 # currentWorkDuration 应该是 1800 (30分钟)
 ```
 
-**修复**: 确保推迟逻辑只使用临时变量 ([`AppDelegate.swift:1332-1335`](../Sources/TwentyTwentyTwenty/AppDelegate.swift#L1332-L1335))
+**修复**: 确保推迟逻辑只使用临时变量 ([`AppDelegate.swift:1332-1335`](../Sources/TwentyGuard/AppDelegate.swift#L1332-L1335))
 
 #### 问题3: 多个休息窗口残留
 
@@ -645,7 +675,7 @@ cat ~/Library/Application\ Support/com.twentytwentytwenty/current_session.json
 **排查**:
 ```swift
 // 检查日志中的窗口创建/清理消息
-log show --predicate 'subsystem == "com.twentytwentytwenty"' --last 1h
+log show --predicate 'subsystem == "com.javengroup.twentyguard"' --last 1h
 
 // 查找 "🧹 开始清理休息窗口" 和 "✅ 窗口清理完成"
 ```
@@ -656,20 +686,20 @@ log show --predicate 'subsystem == "com.twentytwentytwenty"' --last 1h
 
 **应用支持目录**:
 ```
-~/Library/Application Support/com.twentytwentytwenty/
-├── 20_20_20_stats.db         # SQLite数据库
+~/Library/Application Support/com.javengroup.twentyguard/
+├── twentyguard_stats.db         # SQLite数据库
 ├── current_session.json      # 当前会话状态
 └── logs/
     ├── 2025-10-31.jsonl      # 今日日志
     └── ...
 ```
 
-该目录名来自旧版 20-20-20，本次品牌迁移暂时保留它以避免丢失已有统计数据。
+旧版 `20-20-20` 数据目录不再兼容读取；TwentyGuard 使用该新目录重新开始记录统计、日志和会话状态。
 
 **系统日志**:
 ```bash
 # 查看应用日志
-log show --predicate 'process == "TwentyTwentyTwenty"' --last 1h
+log show --predicate 'process == "TwentyGuard"' --last 1h
 
 # 查看系统睡眠事件
 log show --predicate 'subsystem == "com.apple.power"' --last 1h
@@ -679,7 +709,7 @@ log show --predicate 'subsystem == "com.apple.power"' --last 1h
 
 ```bash
 # 打开数据库
-sqlite3 ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
+sqlite3 ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stats.db
 
 # 查看今日统计
 SELECT * FROM daily_stats WHERE date = date('now');
@@ -713,7 +743,7 @@ LIMIT 10;
 **修改数据存储时必查**:
 - [ ] 是否同时更新 SQLite 和 JSONL？
 - [ ] 是否设置了数据清理策略？
-- [ ] 是否处理了数据库迁移？
+- [ ] 是否明确处理了数据 reset / schema reset 策略？
 - [ ] 是否有备份恢复机制？
 
 ### 10.5 性能监控指标
@@ -727,13 +757,13 @@ LIMIT 10;
 **异常检测**:
 ```bash
 # CPU 使用率
-top -l 1 | grep TwentyTwentyTwenty
+top -l 1 | grep TwentyGuard
 
 # 内存占用
-ps aux | grep TwentyTwentyTwenty | awk '{print $6}'
+ps aux | grep TwentyGuard | awk '{print $6}'
 
 # 数据库大小
-du -h ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
+du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stats.db
 ```
 
 ---
@@ -750,6 +780,7 @@ du -h ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
 | v1.1.0 | 2025-10-31 | 推迟机制重构：从单按钮限制改为累计时长限制 |
 | v1.2.0 | 2026-04-26 | 默认推迟上限降为 5 分钟，自定义模式支持 5/10 分钟上限 |
 | v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，更新 bundle 元数据、构建产物和发布路径 |
+| v1.5.0 | 2026-05-05 | 内部 SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版本地数据不迁移；发布 Developer ID 签名并公证的 DMG |
 
 ### B. 相关文档
 
@@ -765,5 +796,5 @@ du -h ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db
 
 ---
 
-**最后更新**: 2026-05-03
-**文档版本**: v1.4.0
+**最后更新**: 2026-05-05
+**文档版本**: v1.5.0

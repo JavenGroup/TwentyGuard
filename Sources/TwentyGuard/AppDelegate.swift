@@ -1,13 +1,11 @@
 import Cocoa
 import ServiceManagement
-import TwentyTwentyTwentyCore
+import TwentyGuardCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private enum AppIdentity {
         static let displayName = "TwentyGuard"
         static let bundleIdentifier = "com.javengroup.twentyguard"
-        static let legacyBundleIdentifier = "com.example.twentytwentytwenty"
-        static let defaultsMigrationKey = "didMigrateDefaultsFrom2020ToTwentyGuard"
     }
 
     private var statusBarItem: NSStatusItem!
@@ -306,7 +304,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        migrateLegacyUserDefaultsIfNeeded()
         loadSettings()
         setupStatusBar()
         setupMenu()
@@ -336,10 +333,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let runningApps = NSWorkspace.shared.runningApplications
         let currentPID = ProcessInfo.processInfo.processIdentifier
         let currentExecutablePath = Bundle.main.executablePath
-        let conflictingBundleIdentifiers = Set([
-            Bundle.main.bundleIdentifier,
-            AppIdentity.legacyBundleIdentifier
-        ].compactMap { $0 })
+        let conflictingBundleIdentifiers = Set([Bundle.main.bundleIdentifier].compactMap { $0 })
         
         print("检查单实例：当前进程 \(currentPID)，可执行路径：\(currentExecutablePath ?? "unknown")")
         
@@ -379,27 +373,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    private func migrateLegacyUserDefaultsIfNeeded() {
-        guard Bundle.main.bundleIdentifier == AppIdentity.bundleIdentifier else { return }
-
-        let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: AppIdentity.defaultsMigrationKey) else { return }
-
-        let legacyDomain = defaults.persistentDomain(forName: AppIdentity.legacyBundleIdentifier) ?? [:]
-        let currentDomain = defaults.persistentDomain(forName: AppIdentity.bundleIdentifier) ?? [:]
-
-        for (key, value) in legacyDomain where currentDomain[key] == nil {
-            defaults.set(value, forKey: key)
-        }
-
-        defaults.set(true, forKey: AppIdentity.defaultsMigrationKey)
-        defaults.synchronize()
-
-        if !legacyDomain.isEmpty {
-            print("✅ 已迁移旧版 20-20-20 用户设置到 TwentyGuard")
-        }
-    }
-    
     private func restoreSessionIfNeeded() -> Bool {
         logManager.logEvent(.appLaunched, context: ["debug": "restore_start"])
 
@@ -1131,7 +1104,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 构建显示内容
         let appName = versionData["app_name"] as? String ?? AppIdentity.displayName
-        let version = versionData["current_version"] as? String ?? "1.4.0"
+        let version = versionData["current_version"] as? String ?? "1.5.0"
 
         var creditsText = ""
 
@@ -1186,7 +1159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func loadVersionHistory() -> [String: Any]? {
         // 方法 1: 尝试从资源包加载
-        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyTwentyTwenty_TwentyTwentyTwenty", withExtension: "bundle"),
+        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyGuard_TwentyGuard", withExtension: "bundle"),
            let resourceBundle = Bundle(url: bundle),
            let jsonPath = resourceBundle.path(forResource: "version-history", ofType: "json", inDirectory: "Resources") {
 
@@ -1248,8 +1221,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let options: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: AppIdentity.displayName,
-            .applicationVersion: "1.4.0",
-            .version: "1.4.0",
+            .applicationVersion: "1.5.0",
+            .version: "1.5.0",
             .credits: defaultCredits
         ]
 
@@ -1590,7 +1563,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Try different ways to load the custom icon for SPM
         
         // Method 1: Try to load from module bundle with high-res support
-        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyTwentyTwenty_TwentyTwentyTwenty", withExtension: "bundle"),
+        if let bundle = Bundle(for: type(of: self)).url(forResource: "TwentyGuard_TwentyGuard", withExtension: "bundle"),
            let resourceBundle = Bundle(url: bundle) {
             
             // Create an NSImage and add both 1x and 2x representations

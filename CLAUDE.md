@@ -68,7 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Single Project Architecture** (Swift Package Manager):
 - Location: `/Users/javenfang/Projects/TwentyGuard/`
-- Legacy compatibility symlink: `/Users/javenfang/Projects/20-20-20 -> TwentyGuard`
+- Historical local symlink may exist: `/Users/javenfang/Projects/20-20-20 -> TwentyGuard`
 - No Xcode project files needed, everything managed via Makefile
 - Core Files: AppDelegate.swift, BreakOverlayWindow.swift, EventRecorder.swift, StatsDatabase.swift
 
@@ -83,11 +83,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Current Implementation Docs**:
 - **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** - Functional requirements: complete feature list and user scenarios
 - **[docs/architecture.md](docs/architecture.md)** - Technical architecture: in-depth implementation details and maintenance guide
-- **[docs/bugfix-history.md](docs/bugfix-history.md)** - Bug fix history: root cause analysis and fix records
 
-**Archived Historical Docs**:
-- **[docs/prd-statistics-requirements.md](docs/prd-statistics-requirements.md)** - Statistics requirements changes (implemented in v1.1.0)
-- **[docs/design-statistics-system.md](docs/design-statistics-system.md)** - Statistics system design (implemented in v1.1.0)
+Historical PRDs, implementation plans, and old bug-fix records have been removed. Keep durable product and architecture decisions in the two current docs above.
 
 ## 🚀 Standardized Build Process
 
@@ -153,7 +150,7 @@ make launch     # Step 3: Launch new version
 
 **⚠️ MUST check before every new release:**
 
-1. **Update Version History File**: [Sources/TwentyTwentyTwenty/Resources/version-history.json](Sources/TwentyTwentyTwenty/Resources/version-history.json)
+1. **Update Version History File**: [Sources/TwentyGuard/Resources/version-history.json](Sources/TwentyGuard/Resources/version-history.json)
    - Update `current_version` field (e.g., "1.2.0")
    - Add new version record at **beginning** of `versions` array
    - Include: version number, date (YYYY-MM-DD), major changes list
@@ -200,26 +197,26 @@ make launch     # Step 3: Launch new version
 
 JSONL is the source of truth for event records; database is the query optimization layer. Any statistics issues should start investigation from JSONL.
 
-**Brand migration note**: The public app name, bundle name, and install path are now `TwentyGuard`, but local statistics data intentionally remains under `~/Library/Application Support/com.twentytwentytwenty/` until an explicit data-path migration is implemented.
+**Data reset note**: TwentyGuard intentionally does **not** migrate old `20-20-20` local data. Statistics, JSONL logs, and session recovery now start fresh under `~/Library/Application Support/com.javengroup.twentyguard/`.
 
 **When statistics window shows no data, check in this order:**
 
 1. **First Check JSONL Files** (are events recorded):
    ```bash
-   cat ~/Library/Application\ Support/com.twentytwentytwenty/logs/$(date +%Y-%m-%d).jsonl | jq -r '.eventType' | sort | uniq -c
+   cat ~/Library/Application\ Support/com.javengroup.twentyguard/logs/$(date +%Y-%m-%d).jsonl | jq -r '.eventType' | sort | uniq -c
    ```
    Should see: `work_started`, `break_started`, `work_completed`, `break_completed` events
 
 2. **Check sessions Table** (is data written to database):
    ```bash
-   sqlite3 ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db \
+   sqlite3 ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stats.db \
      "SELECT COUNT(*) FROM sessions WHERE date(start_time, 'unixepoch') = date('now');"
    ```
    Should return today's session count (> 0)
 
 3. **Check Table Schema** (confirm field names are correct):
    ```bash
-   sqlite3 ~/Library/Application\ Support/com.twentytwentytwenty/20_20_20_stats.db \
+   sqlite3 ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stats.db \
      "PRAGMA table_info(sessions);"
    ```
    Confirm existence of fields: `postpones` (JSON), `break_info` (JSON), `actual_work_duration`
@@ -246,9 +243,33 @@ JSONL is the source of truth for event records; database is the query optimizati
 
 - ✅ **Bundle ID**: `com.javengroup.twentyguard`
 - ✅ **App Name**: "TwentyGuard"
-- ✅ **Version**: 1.4.0
+- ✅ **Version**: 1.5.0
 - ✅ **Minimum macOS**: 12.0
-- ✅ **Code Signing**: Configured
+- ⚠️ **Development Signing**: `make build-app` uses ad-hoc signing for local install/test only
+- ✅ **Public Direct Download**: v1.5.0 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
 - ✅ **Size**: ~952KB (extremely lightweight)
 
-The app is ready for App Store submission or direct distribution.
+For direct distribution outside the Mac App Store, Apple requires the app to be
+signed with a Developer ID certificate and submitted for notarization. The
+release path is configured for the Shenzhen Lifangjuzhen team:
+
+```bash
+# One-time setup after installing the Developer ID Application certificate.
+make notary-store-credentials APPLE_ID=<apple-id-email> TEAM_ID=MDQ5F44RU5
+
+# Per release.
+make release \
+  TEAM_ID=MDQ5F44RU5 \
+  DEVELOPER_ID_APPLICATION="Developer ID Application: Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)"
+```
+
+`make release` builds `dist/TwentyGuard-v1.5.0.dmg`, signs the app and DMG,
+submits the DMG for notarization, staples the ticket, and verifies Gatekeeper.
+Do not upload a `make dmg` output as the public release artifact unless it has
+also gone through the Developer ID notarization path.
+
+Latest verified release artifact:
+- **Path**: `dist/TwentyGuard-v1.5.0.dmg`
+- **Notary submission**: `51800058-d1df-4e2b-a082-78723996cbf6`
+- **Gatekeeper**: accepted, source `Notarized Developer ID`
+- **SHA-256**: `8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88`

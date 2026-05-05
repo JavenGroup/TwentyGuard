@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 import AppKit
-import TwentyTwentyTwentyCore
+import TwentyGuardCore
 
 // MARK: - Data Models
 
@@ -76,15 +76,14 @@ class StatsDatabase {
     static let shared = StatsDatabase()
 
     private var db: OpaquePointer?
-    private let dbQueue = DispatchQueue(label: "com.twentytwentytwenty.database", qos: .userInitiated)
+    private let dbQueue = DispatchQueue(label: "com.javengroup.twentyguard.database", qos: .userInitiated)
     private let fileManager = FileManager.default
     private var isValid = false
 
     private var databaseURL: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appFolder = appSupport.appendingPathComponent("com.twentytwentytwenty")
-        try? fileManager.createDirectory(at: appFolder, withIntermediateDirectories: true)
-        return appFolder.appendingPathComponent("20_20_20_stats.db")
+        let paths = AppDataPaths.live(fileManager: fileManager)
+        try? fileManager.createDirectory(at: paths.appSupportURL, withIntermediateDirectories: true)
+        return paths.databaseURL
     }
 
     private init() {
@@ -114,9 +113,8 @@ class StatsDatabase {
     }
 
     private func createTablesManually() {
-        // Check if migration is needed
-        if needsMigration() {
-            performMigration()
+        if needsSchemaReset() {
+            resetOutdatedSchema()
         }
 
         // Direct table creation without error throwing
@@ -166,7 +164,7 @@ class StatsDatabase {
         print("✅ Database tables created (v1.2.0), database is now valid")
     }
 
-    private func needsMigration() -> Bool {
+    private func needsSchemaReset() -> Bool {
         // Check if sessions table has the new JSON fields
         var stmt: OpaquePointer?
         let query = "PRAGMA table_info(sessions)"
@@ -194,12 +192,12 @@ class StatsDatabase {
 
         sqlite3_finalize(stmt)
 
-        // Need migration if table exists but doesn't have new fields
+        // Reset if a local development database exists without the current JSON fields.
         return hasSessionsTable && (!hasPostponesField || !hasBreakInfoField)
     }
 
-    private func performMigration() {
-        print("⚠️ Detected old database version, performing migration...")
+    private func resetOutdatedSchema() {
+        print("⚠️ Detected outdated local database schema, resetting tables...")
 
         // Rename old table
         sqlite3_exec(db, "ALTER TABLE sessions RENAME TO sessions_v1_backup", nil, nil, nil)
@@ -210,7 +208,7 @@ class StatsDatabase {
         // Drop old postpone_events table if exists
         sqlite3_exec(db, "DROP TABLE IF EXISTS postpone_events", nil, nil, nil)
 
-        print("✅ Migration completed: old data backed up to sessions_v1_backup")
+        print("✅ Schema reset completed: previous sessions table backed up to sessions_v1_backup")
     }
 
     private func openDatabase() throws {
@@ -308,8 +306,8 @@ class StatsDatabase {
     }
 
     private func createTables() throws {
-        if needsMigration() {
-            performMigration()
+        if needsSchemaReset() {
+            resetOutdatedSchema()
         }
 
         let createSessionsTable = """

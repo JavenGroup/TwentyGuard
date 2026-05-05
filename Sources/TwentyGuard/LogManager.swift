@@ -1,4 +1,5 @@
 import Foundation
+import TwentyGuardCore
 
 // MARK: - Log Data Models
 
@@ -64,7 +65,7 @@ struct SessionState: Codable {
 class LogManager {
     static let shared = LogManager()
     
-    private let logQueue = DispatchQueue(label: "com.twentytwentytwenty.logmanager", qos: .utility)
+    private let logQueue = DispatchQueue(label: "com.javengroup.twentyguard.logmanager", qos: .utility)
     private let fileManager = FileManager.default
     
     // 存储路径
@@ -74,11 +75,10 @@ class LogManager {
     
     
     private init() {
-        // 使用 Application Support 目录
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        self.appSupportURL = appSupport.appendingPathComponent("com.twentytwentytwenty")
-        self.logsDirectoryURL = appSupportURL.appendingPathComponent("logs")
-        self.sessionStateURL = appSupportURL.appendingPathComponent("current_session.json")
+        let paths = AppDataPaths.live(fileManager: fileManager)
+        self.appSupportURL = paths.appSupportURL
+        self.logsDirectoryURL = paths.logsDirectoryURL
+        self.sessionStateURL = paths.sessionStateURL
         
         // 创建目录
         createDirectoriesIfNeeded()
