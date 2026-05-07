@@ -21,50 +21,62 @@ public struct StatsHealthVerdict: Equatable, Sendable {
 public struct StatsHealthVerdictEvaluator: Sendable {
     public init() {}
 
-    public func verdict(for day: StatsDaySnapshot) -> StatsHealthVerdict {
+    public func verdict(
+        for day: StatsDaySnapshot,
+        localize: (String) -> String = { AppLocalization.localized($0, language: AppLocalization.defaultLanguageCode) }
+    ) -> StatsHealthVerdict {
         if day.workSessions == 0 && day.totalWorkSeconds == 0 {
             return StatsHealthVerdict(
-                title: "暂无记录",
-                reason: "今天还没有有效工作会话",
+                title: localize("verdictNoDataTitle"),
+                reason: localize("verdictNoDataReason"),
                 severity: .neutral
             )
         }
 
         if day.longestWorkSeconds > 90 * 60 {
             return StatsHealthVerdict(
-                title: "工作过长",
-                reason: "最长连续工作 \(formatDuration(day.longestWorkSeconds))，超过建议上限",
+                title: localize("verdictLongWorkTitle"),
+                reason: String(
+                    format: localize("verdictLongWorkReasonFormat"),
+                    formatDuration(day.longestWorkSeconds, localize: localize)
+                ),
                 severity: .warning
             )
         }
 
         if day.breakOpportunities > 0 && day.breakCompletionRate < 0.8 {
             return StatsHealthVerdict(
-                title: "休息不足",
-                reason: "休息完成率 \(formatPercent(day.breakCompletionRate))，低于 80%",
+                title: localize("verdictLowBreakTitle"),
+                reason: String(
+                    format: localize("verdictLowBreakReasonFormat"),
+                    formatPercent(day.breakCompletionRate)
+                ),
                 severity: .warning
             )
         }
 
         if day.breakOpportunities > 0 && day.postponeSessionRate > 0.3 {
             return StatsHealthVerdict(
-                title: "推迟过多",
-                reason: "推迟会话占比 \(formatPercent(day.postponeSessionRate))，高于 30%",
+                title: localize("verdictHighPostponeTitle"),
+                reason: String(
+                    format: localize("verdictHighPostponeReasonFormat"),
+                    formatPercent(day.postponeSessionRate)
+                ),
                 severity: .warning
             )
         }
 
         if day.isHealthyDay {
             return StatsHealthVerdict(
-                title: "节奏正常",
-                reason: "休息完成率达标，连续工作没有明显超长",
+                title: localize("verdictHealthyTitle"),
+                reason: localize("verdictHealthyReason"),
                 severity: .good
             )
         }
 
         return StatsHealthVerdict(
-            title: "需要留意",
-            reason: "今天有记录，但还不足以判断为健康节奏",
+            title: localize("verdictAttentionTitle"),
+            reason: localize("verdictAttentionReason"),
             severity: .neutral
         )
     }
@@ -73,18 +85,18 @@ public struct StatsHealthVerdictEvaluator: Sendable {
         "\(Int((value * 100).rounded()))%"
     }
 
-    private func formatDuration(_ seconds: Int) -> String {
-        guard seconds > 0 else { return "0 分钟" }
+    private func formatDuration(_ seconds: Int, localize: (String) -> String) -> String {
+        guard seconds > 0 else { return localize("statsZeroMinutes") }
         let minutes = max(1, seconds / 60)
         let hours = minutes / 60
         let remainingMinutes = minutes % 60
 
         if hours > 0 && remainingMinutes > 0 {
-            return "\(hours) 小时 \(remainingMinutes) 分钟"
+            return String(format: localize("statsHoursMinutesFormat"), hours, remainingMinutes)
         }
         if hours > 0 {
-            return "\(hours) 小时"
+            return String(format: localize("statsHoursFormat"), hours)
         }
-        return "\(minutes) 分钟"
+        return String(format: localize("statsMinutesFormat"), minutes)
     }
 }

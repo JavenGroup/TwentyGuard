@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TwentyGuard",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v12)
     ],
@@ -19,7 +20,10 @@ let package = Package(
     targets: [
         .target(
             name: "TwentyGuardCore",
-            dependencies: []
+            dependencies: [],
+            resources: [
+                .process("Resources")
+            ]
         ),
         .executableTarget(
             name: "TwentyGuard",

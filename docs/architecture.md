@@ -1,6 +1,6 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.5.1
+> **文档版本**: v1.5.2
 > **最后更新**: 2026-05-07
 > **维护者**: Javen Fang (@javenfang)
 
@@ -473,19 +473,27 @@ graph TB
 
 ### 7.2 实现方式
 
-**字典式本地化** ([`AppDelegate.swift:91-226`](../Sources/TwentyGuard/AppDelegate.swift#L91-L226)):
-- 使用嵌套字典 `[语言代码: [键: 翻译]]` 存储所有翻译
-- `localized(_ key:)` 方法：当前语言 → 中文兜底 → key 原样返回
-- 所有 UI 文本通过 `localized()` 动态获取
+**SwiftPM 资源化本地化**:
+- 翻译文件位于 `Sources/TwentyGuardCore/Resources/<language>.lproj/Localizable.strings`
+- `Package.swift` 设置 `defaultLocalization: "en"`，并通过 `TwentyGuardCore` target 处理本地化资源
+- `AppLocalization` 统一负责语言检测、字符串查找和兜底策略
+- `AppDelegate.localized(_:)` 只保留薄封装，UI 文本不再维护内联 Swift 字典
+- `Makefile` 会复制 SwiftPM 生成的 resource bundle 到 `.app/Contents/Resources/`
+
+**测试保护**:
+- `AppLocalizationTests` 校验 5 种语言的 key 完全一致
+- `AppLocalizationTests` 校验所有本地化格式占位符一致，避免 `%@` / `%d` / `%%` 运行时格式错误
+- `StatsHealthVerdictTests` 覆盖健康判断文案在中文 localizer 下的输出
 
 ### 7.3 语言切换
 
-**自动检测** ([`AppDelegate.swift:398-413`](../Sources/TwentyGuard/AppDelegate.swift#L398-L413)):
+**自动检测**:
 - 优先使用保存的语言设置
-- 否则根据 `Locale.preferredLanguages.first` 自动选择
-- 匹配规则: `zh-Hans` → 简体中文, `en` → English, 等
+- 否则根据 `Locale.preferredLanguages` 自动选择
+- 匹配规则: `zh*` → 简体中文, `en*` → English, `es*` → Español, `ja*` → 日本語, `ko*` → 한국어
+- 未匹配语言使用 English
 
-**运行时切换** ([`AppDelegate.swift:1553-1572`](../Sources/TwentyGuard/AppDelegate.swift#L1553-L1572)):
+**运行时切换**:
 - 保存新语言 → 重建菜单 → 更新休息窗口文本
 - 无需重启应用，立即生效
 
@@ -529,7 +537,7 @@ make clean        # 清理构建产物
 <key>CFBundleIdentifier</key>
 <string>com.javengroup.twentyguard</string>
 <key>CFBundleVersion</key>
-<string>1.5.1</string>
+<string>1.5.2</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -553,12 +561,12 @@ make release \
 5. stapler 写入公证票据
 6. 使用 `codesign`、`spctl` 和 `stapler validate` 验证发布产物
 
-**v1.5.0 发布验证结果**:
+**v1.5.2 发布验证结果**:
 - Developer ID: `Developer ID Application: Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)`
-- Notary submission: `51800058-d1df-4e2b-a082-78723996cbf6`
+- Notary submission: `22fccf2d-c96d-4b19-9692-2840c9999e95`
 - Gatekeeper: `accepted`, source `Notarized Developer ID`
-- 发布产物: `dist/TwentyGuard-v1.5.0.dmg`
-- SHA-256: `8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88`
+- 发布产物: `dist/TwentyGuard-v1.5.2.dmg`
+- SHA-256: `9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f`
 
 ### 8.4 版本管理
 
@@ -782,6 +790,7 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 | v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，更新 bundle 元数据、构建产物和发布路径 |
 | v1.5.0 | 2026-05-05 | 内部 SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版本地数据不迁移；发布 Developer ID 签名并公证的 DMG |
 | v1.5.1 | 2026-05-07 | 更新 app 图标与状态栏图标资源；补充营销发布资料、渠道草稿和素材清单 |
+| v1.5.2 | 2026-05-07 | 多语言系统迁移到 SwiftPM `.lproj/Localizable.strings` 标准资源；补齐夜间禁用和统计面板翻译；新增多语言完整性测试；发布 Developer ID 签名并公证的 DMG |
 
 ### B. 相关文档
 
@@ -798,4 +807,4 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 ---
 
 **最后更新**: 2026-05-07
-**文档版本**: v1.5.1
+**文档版本**: v1.5.2

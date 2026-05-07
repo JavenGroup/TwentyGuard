@@ -107,194 +107,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - Localization
     
-    // Language localization dictionary
-    private var localizations: [String: [String: String]] = [
-        "zh-Hans": [
-            "screenUsage": "屏幕使用",
-            "screenBreak": "屏幕禁用",
-            "mode": "模式切换",
-            "defaultMode": "20-20-20",
-            "customMode": "自定义",
-            "settings": "设置",
-            "language": "语言",
-            "loginAtStartup": "登录时启动",
-            "showCountdown": "在菜单栏显示倒计时",
-            "testBreak": "现在休息",
-            "quit": "退出",
-            "minutes": "分钟",
-            "seconds": "秒",
-            "breakOverlayTitle": "屏幕保护时间",
-            "breakOverlayText": "20-20-20 眼部保护：看向远处 20 英尺（6 米）外的物体",
-            "breakOverlayRule": "屏幕使用 : 20 分钟\n屏幕禁用 : 20 秒\n看看远方 : 20 米",
-            "postpone1": "推迟 1 分钟 (⌘1)",
-            "postpone2": "推迟 2 分钟 (⌘2)",
-            "postpone5": "推迟 5 分钟 (⌘5)",
-            "postponed": "推迟",
-            "postpone_status": "已推迟 %d 分钟，剩余可推迟 %d 分钟",
-            "appAlreadyRunning": "应用已在运行",
-            "appAlreadyRunningMessage": "TwentyGuard 已经在运行中，只能同时运行一个实例。",
-            "ok": "确定",
-            "eyeHealthStats": "👁️ 眼睛健康统计",
-            "close": "关闭",
-            "eye_health_report": "👁️ 眼睛健康报告",
-            "about": "关于",
-            "postponeLimit": "推迟上限",
-            "nightRestriction": "夜间禁用",
-            "nightRestrictionEnabled": "启用",
-            "nightWindDownStart": "收紧开始",
-            "nightLockStart": "完全禁用",
-            "nightUnlockTime": "恢复可用",
-            "nightRhythmToday": "今晚",
-            "nightTestingExit": "测试出口",
-            "nightTestingExitShown": "显示",
-            "nightTestingExitHidden": "隐藏",
-            "nightRhythmCurrent": "当前",
-            "nightRhythmStage": "收紧",
-            "nightRhythmLockedAfter": "完全禁用后",
-            "nightWindDownStatus": "夜间收紧",
-            "nightLockedStatus": "夜间禁用中",
-            "nightDisabled": "禁用",
-            "nightWindDownBreakHint": "夜间收紧中，当前屏幕使用上限：%@，%@ 后将完全禁用屏幕"
-        ],
-        "en": [
-            "screenUsage": "Screen Time",
-            "screenBreak": "Screen Break",
-            "mode": "Mode",
-            "defaultMode": "20-20-20",
-            "customMode": "Custom",
-            "settings": "Settings",
-            "language": "Language",
-            "loginAtStartup": "Launch at Login",
-            "showCountdown": "Show Countdown in Menu Bar",
-            "testBreak": "Break Now",
-            "quit": "Quit",
-            "minutes": "min",
-            "seconds": "sec",
-            "breakOverlayTitle": "Screen Break Time",
-            "breakOverlayText": "20-20-20 Eye Protection: Look at something 20 feet (6 meters) away",
-            "breakOverlayRule": "Screen Time : 20 minutes\nScreen Break : 20 seconds\nLook Distance : 20 feet",
-            "postpone1": "Postpone 1 minute (⌘1)",
-            "postpone2": "Postpone 2 minutes (⌘2)",
-            "postpone5": "Postpone 5 minutes (⌘5)",
-            "postponed": "Postponed",
-            "postpone_status": "Postponed %d min, %d min left",
-            "appAlreadyRunning": "App Already Running",
-            "appAlreadyRunningMessage": "TwentyGuard is already running. Only one instance can run at a time.",
-            "ok": "OK",
-            "eyeHealthStats": "👁️ Eye Health Stats",
-            "close": "Close",
-            "eye_health_report": "👁️ Eye Health Report",
-            "about": "About",
-            "postponeLimit": "Postpone Limit",
-            "nightRestriction": "Night Screen Lock",
-            "nightRestrictionEnabled": "Enable",
-            "nightWindDownStart": "Wind-down Starts",
-            "nightLockStart": "Full Lock Starts",
-            "nightUnlockTime": "Unlocks",
-            "nightRhythmToday": "Tonight",
-            "nightTestingExit": "Testing Escape",
-            "nightTestingExitShown": "Shown",
-            "nightTestingExitHidden": "Hidden",
-            "nightRhythmCurrent": "Current",
-            "nightRhythmStage": "Wind-down",
-            "nightRhythmLockedAfter": "After Full Lock",
-            "nightWindDownStatus": "Night Wind-down",
-            "nightLockedStatus": "Night Lock Active",
-            "nightDisabled": "Locked",
-            "nightWindDownBreakHint": "Night wind-down: current screen-use limit is %@. Full lock starts at %@"
-        ],
-        "es": [
-            "screenUsage": "Tiempo de Pantalla",
-            "screenBreak": "Descanso de Pantalla",
-            "mode": "Modo",
-            "defaultMode": "20-20-20",
-            "customMode": "Personalizado",
-            "settings": "Configuración",
-            "language": "Idioma",
-            "loginAtStartup": "Iniciar al Arranque",
-            "showCountdown": "Mostrar Cuenta Regresiva",
-            "testBreak": "Descansar Ahora",
-            "quit": "Salir",
-            "minutes": "min",
-            "seconds": "seg",
-            "breakOverlayTitle": "Tiempo de Descanso",
-            "breakOverlayText": "Protección Ocular 20-20-20: Mira algo a 20 pies (6 metros) de distancia",
-            "breakOverlayRule": "Tiempo de Pantalla : 20 minutos\nDescanso : 20 segundos\nDistancia : 20 pies",
-            "postpone1": "Posponer 1 minuto (⌘1)",
-            "postpone2": "Posponer 2 minutos (⌘2)",
-            "postpone5": "Posponer 5 minutos (⌘5)",
-            "postponed": "Pospuesto",
-            "postpone_status": "Pospuesto %d min, quedan %d min",
-            "appAlreadyRunning": "Aplicación Ya Ejecutándose",
-            "appAlreadyRunningMessage": "TwentyGuard ya está ejecutándose. Solo puede ejecutarse una instancia a la vez.",
-            "ok": "OK",
-            "eyeHealthStats": "👁️ Estadísticas de Salud Ocular",
-            "close": "Cerrar",
-            "eye_health_report": "👁️ Informe de Salud Ocular",
-            "about": "Acerca de",
-            "postponeLimit": "Límite de Aplazamiento"
-        ],
-        "ja": [
-            "screenUsage": "画面使用時間",
-            "screenBreak": "画面休憩",
-            "mode": "モード",
-            "defaultMode": "20-20-20",
-            "customMode": "カスタム",
-            "settings": "設定",
-            "language": "言語",
-            "loginAtStartup": "ログイン時に起動",
-            "showCountdown": "メニューバーにカウントダウン表示",
-            "testBreak": "今すぐ休憩",
-            "quit": "終了",
-            "minutes": "分",
-            "seconds": "秒",
-            "breakOverlayTitle": "画面休憩時間",
-            "breakOverlayText": "20-20-20 眼の保護：20フィート（6メートル）先のものを見る",
-            "breakOverlayRule": "画面使用 : 20分\n画面休憩 : 20秒\n視距離 : 20フィート",
-            "postpone1": "1分延期 (⌘1)",
-            "postpone2": "2分延期 (⌘2)",
-            "postpone5": "5分延期 (⌘5)",
-            "postponed": "延期",
-            "postpone_status": "%d分延期済み、残り%d分",
-            "eyeHealthStats": "👁️ 目の健康統計",
-            "close": "閉じる",
-            "eye_health_report": "👁️ 目の健康レポート",
-            "about": "アプリについて",
-            "postponeLimit": "延期上限"
-        ],
-        "ko": [
-            "screenUsage": "화면 사용 시간",
-            "screenBreak": "화면 휴식",
-            "mode": "모드",
-            "defaultMode": "20-20-20",
-            "customMode": "사용자 정의",
-            "settings": "설정",
-            "language": "언어",
-            "loginAtStartup": "로그인 시 시작",
-            "showCountdown": "메뉴바에 카운트다운 표시",
-            "testBreak": "지금 휴식",
-            "quit": "종료",
-            "minutes": "분",
-            "seconds": "초",
-            "breakOverlayTitle": "화면 휴식 시간",
-            "breakOverlayText": "20-20-20 눈 보호: 20피트(6미터) 떨어진 곳을 바라보세요",
-            "breakOverlayRule": "화면 사용 : 20분\n화면 휴식 : 20초\n시선 거리 : 20피트",
-            "postpone1": "1분 연기 (⌘1)",
-            "postpone2": "2분 연기 (⌘2)",
-            "postpone5": "5분 연기 (⌘5)",
-            "postponed": "연기",
-            "postpone_status": "%d분 연기됨, %d분 남음",
-            "eyeHealthStats": "👁️ 눈 건강 통계",
-            "close": "닫기",
-            "eye_health_report": "👁️ 눈 건강 보고서",
-            "about": "정보",
-            "postponeLimit": "연기 한도"
-        ]
-    ]
-    
     // Localization helper
     private func localized(_ key: String) -> String {
-        return localizations[currentLanguage]?[key] ?? localizations["zh-Hans"]?[key] ?? key
+        AppLocalization.localized(key, language: currentLanguage)
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -462,24 +277,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCustomMode = UserDefaults.standard.bool(forKey: "isCustomMode")
         
         // Load language setting
-        if let savedLanguage = UserDefaults.standard.string(forKey: "currentLanguage") {
+        if let savedLanguage = UserDefaults.standard.string(forKey: "currentLanguage"),
+           AppLocalization.supportedLanguageCodes.contains(savedLanguage) {
             currentLanguage = savedLanguage
         } else {
             // Auto-detect system language
-            let systemLanguage = Locale.preferredLanguages.first ?? "en"
-            if systemLanguage.hasPrefix("zh-Hans") {
-                currentLanguage = "zh-Hans"
-            } else if systemLanguage.hasPrefix("en") {
-                currentLanguage = "en"
-            } else if systemLanguage.hasPrefix("es") {
-                currentLanguage = "es"
-            } else if systemLanguage.hasPrefix("ja") {
-                currentLanguage = "ja"
-            } else if systemLanguage.hasPrefix("ko") {
-                currentLanguage = "ko"
-            } else {
-                currentLanguage = "en" // Default fallback
-            }
+            currentLanguage = AppLocalization.languageCode(for: Locale.preferredLanguages)
         }
         
         let savedCustomWorkDuration = UserDefaults.standard.integer(forKey: "customWorkDuration")
@@ -600,15 +403,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let languageItem = NSMenuItem(title: localized("language"), action: nil, keyEquivalent: "")
         let languageSubmenu = NSMenu()
         
-        let languages = [
-            ("en", "English"),
-            ("zh-Hans", "简体中文"),
-            ("es", "Español"),
-            ("ja", "日本語"),
-            ("ko", "한국어")
-        ]
-        
-        for (langCode, langName) in languages {
+        for (langCode, langName) in AppLocalization.languageDisplayNames {
             let item = NSMenuItem(title: langName, action: #selector(selectLanguage(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = langCode

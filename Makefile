@@ -31,6 +31,9 @@ build-app: clean
 	@cp Info.plist "$(BUILD_APP)/Contents/"
 	@cp -r Sources/TwentyGuard.xcassets "$(BUILD_APP)/Contents/Resources/"
 	@cp -r Sources/TwentyGuard/Resources "$(BUILD_APP)/Contents/Resources/"
+	@if ls ./.build/release/*.bundle >/dev/null 2>&1; then \
+		cp -R ./.build/release/*.bundle "$(BUILD_APP)/Contents/Resources/"; \
+	fi
 	@echo "🎨 Copying app icon..."
 	@cp Sources/TwentyGuard/Resources/AppIcon.icns "$(BUILD_APP)/Contents/Resources/AppIcon.icns"
 	@echo "🔏 Signing app bundle..."

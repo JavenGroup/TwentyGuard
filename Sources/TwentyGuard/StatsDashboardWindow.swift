@@ -40,7 +40,7 @@ final class StatsDashboardWindow: NSWindow {
     }
 
     private func setupWindow() {
-        title = "眼睛健康报告"
+        title = localized("eye_health_report")
         minSize = NSSize(width: 560, height: 560)
         isReleasedWhenClosed = false
         backgroundColor = .controlBackgroundColor
@@ -71,7 +71,7 @@ final class StatsDashboardWindow: NSWindow {
         footerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
 
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.title = localizer?("close") ?? "关闭"
+        closeButton.title = localized("close")
         closeButton.bezelStyle = .rounded
         closeButton.target = self
         closeButton.action = #selector(closeWindow)
@@ -144,7 +144,7 @@ final class StatsDashboardWindow: NSWindow {
 
     private func showLoading() {
         clearContent()
-        let label = makeLabel("正在加载统计...", size: 14, color: .secondaryLabelColor)
+        let label = makeLabel(localized("statsLoading"), size: 14, color: .secondaryLabelColor)
         label.alignment = .center
         addContentSection(label)
     }
@@ -168,8 +168,8 @@ final class StatsDashboardWindow: NSWindow {
         let stack = makeVerticalStack(spacing: 8, inset: 16)
         panel.addSubview(stack)
         pin(stack, to: panel)
-        stack.addArrangedSubview(makeLabel("统计数据暂时无法读取", size: 15, weight: .semibold))
-        stack.addArrangedSubview(makeLabel("可以稍后刷新；当前计时功能不受影响。", size: 13, color: .secondaryLabelColor))
+        stack.addArrangedSubview(makeLabel(localized("statsUnavailableTitle"), size: 15, weight: .semibold))
+        stack.addArrangedSubview(makeLabel(localized("statsUnavailableMessage"), size: 13, color: .secondaryLabelColor))
         addContentSection(panel)
         scrollToTop()
     }
@@ -194,13 +194,13 @@ final class StatsDashboardWindow: NSWindow {
         container.addSubview(stack)
         pin(stack, to: container)
 
-        stack.addArrangedSubview(makeLabel("眼睛健康报告", size: 24, weight: .bold))
+        stack.addArrangedSubview(makeLabel(localized("eye_health_report"), size: 24, weight: .bold))
 
         let subtitle: String
         if let snapshot {
-            subtitle = "更新于 \(formatDateTime(snapshot.generatedAt))"
+            subtitle = localizedFormat("statsUpdatedAtFormat", formatDateTime(snapshot.generatedAt))
         } else {
-            subtitle = "统计加载中"
+            subtitle = localized("statsLoadingSubtitle")
         }
         stack.addArrangedSubview(makeLabel(subtitle, size: 12, color: .secondaryLabelColor))
 
@@ -215,8 +215,8 @@ final class StatsDashboardWindow: NSWindow {
         panel.addSubview(stack)
         pin(stack, to: panel)
 
-        let verdict = verdictEvaluator.verdict(for: today)
-        stack.addArrangedSubview(makeLabel("今日判断", size: 13, weight: .medium, color: .secondaryLabelColor))
+        let verdict = verdictEvaluator.verdict(for: today, localize: localized)
+        stack.addArrangedSubview(makeLabel(localized("statsTodayVerdict"), size: 13, weight: .medium, color: .secondaryLabelColor))
 
         let titleLabel = makeLabel(verdict.title, size: 32, weight: .bold, color: verdictColor(verdict.severity))
         titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
@@ -227,7 +227,11 @@ final class StatsDashboardWindow: NSWindow {
 
         if today.totalWorkSeconds > 0 {
             stack.addArrangedSubview(makeLabel(
-                "累计 \(formatDuration(today.totalWorkSeconds))，最长连续 \(formatDuration(today.longestWorkSeconds))",
+                localizedFormat(
+                    "statsTotalAndLongestFormat",
+                    formatDuration(today.totalWorkSeconds),
+                    formatDuration(today.longestWorkSeconds)
+                ),
                 size: 12,
                 color: .tertiaryLabelColor
             ))
@@ -239,25 +243,25 @@ final class StatsDashboardWindow: NSWindow {
     private func makeKeyMetrics(_ today: StatsDaySnapshot) -> NSView {
         let container = makeVerticalStack(spacing: 12, inset: 0)
 
-        container.addArrangedSubview(makeSectionTitle("关键指标"))
+        container.addArrangedSubview(makeSectionTitle(localized("statsKeyMetrics")))
 
         let row = makeHorizontalStack(distribution: .fillEqually)
         row.addArrangedSubview(makeMetricCard(
-            title: "完成率",
+            title: localized("statsCompletionRate"),
             value: formatPercent(today.breakCompletionRate),
-            detail: "\(today.completedBreaks)/\(today.breakOpportunities) 次休息",
+            detail: localizedFormat("statsCompletionDetailFormat", today.completedBreaks, today.breakOpportunities),
             accent: completionColor(today.breakCompletionRate)
         ))
         row.addArrangedSubview(makeMetricCard(
-            title: "推迟",
-            value: "\(today.totalPostpones) 次",
-            detail: "\(today.postponedSessions) 个会话",
+            title: localized("statsPostponeMetric"),
+            value: localizedFormat("statsPostponeCountFormat", today.totalPostpones),
+            detail: localizedFormat("statsPostponedSessionsFormat", today.postponedSessions),
             accent: today.postponeSessionRate > 0.3 ? .systemOrange : .systemGreen
         ))
         row.addArrangedSubview(makeMetricCard(
-            title: "夜间",
-            value: nightRestrictionEnabled() ? "已启用" : "未启用",
-            detail: "晚间收紧与禁用",
+            title: localized("statsNightMetric"),
+            value: nightRestrictionEnabled() ? localized("statsEnabled") : localized("statsDisabled"),
+            detail: localized("statsNightDetail"),
             accent: nightRestrictionEnabled() ? .systemGreen : .secondaryLabelColor,
             monospacedValue: false
         ))
@@ -273,11 +277,11 @@ final class StatsDashboardWindow: NSWindow {
         panel.addSubview(stack)
         pin(stack, to: panel)
 
-        stack.addArrangedSubview(makeSectionTitle("今日明细"))
-        stack.addArrangedSubview(makeInfoRow(title: "累计工作时长", value: formatDuration(today.totalWorkSeconds)))
-        stack.addArrangedSubview(makeInfoRow(title: "休息机会", value: "\(today.breakOpportunities) 次"))
-        stack.addArrangedSubview(makeInfoRow(title: "完成休息", value: "\(today.completedBreaks) 次"))
-        stack.addArrangedSubview(makeInfoRow(title: "推迟分布", value: postponeBreakdown(today.postponesByMinutes)))
+        stack.addArrangedSubview(makeSectionTitle(localized("statsTodayDetails")))
+        stack.addArrangedSubview(makeInfoRow(title: localized("statsTotalWorkDuration"), value: formatDuration(today.totalWorkSeconds)))
+        stack.addArrangedSubview(makeInfoRow(title: localized("statsBreakOpportunities"), value: localizedFormat("statsPostponeCountFormat", today.breakOpportunities)))
+        stack.addArrangedSubview(makeInfoRow(title: localized("statsCompletedBreaks"), value: localizedFormat("statsPostponeCountFormat", today.completedBreaks)))
+        stack.addArrangedSubview(makeInfoRow(title: localized("statsPostponeBreakdown"), value: postponeBreakdown(today.postponesByMinutes)))
 
         return panel
     }
@@ -288,9 +292,14 @@ final class StatsDashboardWindow: NSWindow {
         panel.addSubview(stack)
         pin(stack, to: panel)
 
-        stack.addArrangedSubview(makeSectionTitle("近 7 天"))
+        stack.addArrangedSubview(makeSectionTitle(localized("statsLast7Days")))
         stack.addArrangedSubview(makeLabel(
-            "累计 \(formatDuration(week.totalWorkSeconds)) · 健康 \(week.healthyDays)/7 天 · 完成率 \(formatPercent(week.breakCompletionRate))",
+            localizedFormat(
+                "statsWeekSummaryFormat",
+                formatDuration(week.totalWorkSeconds),
+                week.healthyDays,
+                formatPercent(week.breakCompletionRate)
+            ),
             size: 12,
             color: .secondaryLabelColor
         ))
@@ -311,11 +320,11 @@ final class StatsDashboardWindow: NSWindow {
         panel.addSubview(stack)
         pin(stack, to: panel)
 
-        stack.addArrangedSubview(makeSectionTitle("数据质量"))
+        stack.addArrangedSubview(makeSectionTitle(localized("statsDataQuality")))
 
         let messages = qualityMessages(quality)
         if messages.isEmpty {
-            stack.addArrangedSubview(makeLabel("没有发现会影响统计口径的异常记录。", size: 13, color: .secondaryLabelColor))
+            stack.addArrangedSubview(makeLabel(localized("statsNoQualityIssues"), size: 13, color: .secondaryLabelColor))
         } else {
             for message in messages {
                 stack.addArrangedSubview(makeLabel(message, size: 13, color: .secondaryLabelColor))
@@ -358,10 +367,10 @@ final class StatsDashboardWindow: NSWindow {
         let row = makeHorizontalStack(spacing: 14)
         row.alignment = .centerY
 
-        let dateLabel = makeColumnHeader("日期", width: 68, alignment: .left)
-        let workLabel = makeColumnHeader("工作", width: 178, alignment: .left)
-        let completionLabel = makeColumnHeader("完成", width: 74, alignment: .right)
-        let postponeLabel = makeColumnHeader("推迟", width: 56, alignment: .right)
+        let dateLabel = makeColumnHeader(localized("statsDateColumn"), width: 68, alignment: .left)
+        let workLabel = makeColumnHeader(localized("statsWorkColumn"), width: 178, alignment: .left)
+        let completionLabel = makeColumnHeader(localized("statsCompletionColumn"), width: 74, alignment: .right)
+        let postponeLabel = makeColumnHeader(localized("statsPostponeColumn"), width: 56, alignment: .right)
 
         row.addArrangedSubview(dateLabel)
         row.addArrangedSubview(workLabel)
@@ -481,18 +490,18 @@ final class StatsDashboardWindow: NSWindow {
     }
 
     private func formatDuration(_ seconds: Int) -> String {
-        guard seconds > 0 else { return "0 分钟" }
+        guard seconds > 0 else { return localized("statsZeroMinutes") }
         let minutes = max(1, seconds / 60)
         let hours = minutes / 60
         let remainingMinutes = minutes % 60
 
         if hours > 0 && remainingMinutes > 0 {
-            return "\(hours) 小时 \(remainingMinutes) 分钟"
+            return localizedFormat("statsHoursMinutesFormat", hours, remainingMinutes)
         }
         if hours > 0 {
-            return "\(hours) 小时"
+            return localizedFormat("statsHoursFormat", hours)
         }
-        return "\(minutes) 分钟"
+        return localizedFormat("statsMinutesFormat", minutes)
     }
 
     private func formatPercent(_ value: Double) -> String {
@@ -517,16 +526,16 @@ final class StatsDashboardWindow: NSWindow {
         let five = values[5] ?? 0
         let other = values.filter { ![1, 2, 5].contains($0.key) }.reduce(0) { $0 + $1.value }
         if other > 0 {
-            return "1 分钟 \(one) 次，2 分钟 \(two) 次，5 分钟 \(five) 次，其他 \(other) 次"
+            return localizedFormat("statsPostponeBreakdownWithOtherFormat", one, two, five, other)
         }
-        return "1 分钟 \(one) 次，2 分钟 \(two) 次，5 分钟 \(five) 次"
+        return localizedFormat("statsPostponeBreakdownFormat", one, two, five)
     }
 
     private func longestWorkDetail(_ seconds: Int) -> String {
-        if seconds == 0 { return "今天暂无有效会话" }
-        if seconds > 90 * 60 { return "明显偏长" }
-        if seconds > 60 * 60 { return "需要留意" }
-        return "节奏正常"
+        if seconds == 0 { return localized("statsNoValidSessionsToday") }
+        if seconds > 90 * 60 { return localized("statsObviouslyLong") }
+        if seconds > 60 * 60 { return localized("statsNeedsAttention") }
+        return localized("statsNormalRhythm")
     }
 
     private func verdictColor(_ severity: StatsHealthVerdictSeverity) -> NSColor {
@@ -554,22 +563,30 @@ final class StatsDashboardWindow: NSWindow {
         var messages: [String] = []
 
         if quality.excludedStaleSessions > 0 {
-            messages.append("已排除 \(quality.excludedStaleSessions) 个异常超长会话，不再污染工作时长和健康天数。")
+            messages.append(localizedFormat("statsExcludedStaleSessionsFormat", quality.excludedStaleSessions))
         }
         if quality.ignoredShortSessions > 0 {
-            messages.append("已忽略 \(quality.ignoredShortSessions) 个不足 1 分钟的启动碎片。")
+            messages.append(localizedFormat("statsIgnoredShortSessionsFormat", quality.ignoredShortSessions))
         }
         if quality.activeBreakRecords > 0 {
-            messages.append("发现 \(quality.activeBreakRecords) 个未结束休息记录，未计入完成休息。")
+            messages.append(localizedFormat("statsActiveBreakRecordsFormat", quality.activeBreakRecords))
         }
         if quality.interruptedBreakRecords > 0 {
-            messages.append("发现 \(quality.interruptedBreakRecords) 个被中断的休息记录。")
+            messages.append(localizedFormat("statsInterruptedBreakRecordsFormat", quality.interruptedBreakRecords))
         }
         if quality.unclosedPostponeRecords > 0 {
-            messages.append("发现 \(quality.unclosedPostponeRecords) 条推迟记录缺少结束标记；它们仍计入推迟次数。")
+            messages.append(localizedFormat("statsUnclosedPostponeRecordsFormat", quality.unclosedPostponeRecords))
         }
 
         return messages
+    }
+
+    private func localized(_ key: String) -> String {
+        localizer?(key) ?? AppLocalization.localized(key, language: AppLocalization.fallbackLanguageCode)
+    }
+
+    private func localizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: localized(key), arguments: arguments)
     }
 
     @objc private func closeWindow() {

@@ -7,8 +7,18 @@
     "email": "javen.out@gmail.com",
     "github": "JavenGroup/TwentyGuard"
   },
-  "current_version": "1.5.1",
+  "current_version": "1.5.2",
   "versions": [
+    {
+      "version": "1.5.2",
+      "date": "2026-05-07",
+      "changes": [
+        "Moved app localization to standard SwiftPM .lproj Localizable.strings resources",
+        "Completed Spanish, Japanese, and Korean translations for night screen lock and statistics UI",
+        "Added localization tests that enforce complete language keys and matching format specifiers",
+        "Published a Developer ID signed and Apple-notarized v1.5.2 DMG for direct download"
+      ]
+    },
     {
       "version": "1.5.1",
       "date": "2026-05-07",

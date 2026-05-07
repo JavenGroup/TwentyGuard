@@ -36,17 +36,17 @@ at night when you need a real boundary.
 
 ## Installation
 
-1. Download the latest `TwentyGuard-v1.5.0.dmg` from
+1. Download the latest `TwentyGuard-v1.5.2.dmg` from
    [Releases](https://github.com/JavenGroup/TwentyGuard/releases).
 2. Open the DMG.
 3. Drag `TwentyGuard.app` into `Applications`.
 4. Launch TwentyGuard from Applications.
 
-The v1.5.0 DMG is Developer ID signed, Apple-notarized, and accepted by
+The v1.5.2 DMG is Developer ID signed, Apple-notarized, and accepted by
 Gatekeeper. SHA-256:
 
 ```text
-8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88
+9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f
 ```
 
 Local builds created from source may require right-clicking the app and choosing

@@ -163,6 +163,16 @@ make launch     # Step 3: Launch new version
 - **Build Management**: All builds unified through Makefile
 - **Asset Management**: Resource files centrally managed in Sources/ directory
 
+### Version Discipline
+- **Every user-visible app adjustment MUST bump the app version in the same change set.**
+- Treat feature work, UI copy changes, localization changes, icon/resource changes, behavior changes, packaging changes, and release-facing documentation changes as versioned changes.
+- For each versioned change, update all version sources together:
+  - `Info.plist`: `CFBundleShortVersionString` and `CFBundleVersion`
+  - `Sources/TwentyGuard/Resources/version-history.json`: `current_version` and newest history entry
+  - `docs/REQUIREMENTS.md` and `docs/architecture.md`: document version and version history
+  - `CLAUDE.md`: distribution readiness version when the app version changes
+- Do not leave code/resource/doc changes at the previous app version. If the change is worth building, installing, packaging, or releasing, it needs a new patch/minor version.
+
 ### 📦 Release Checklist
 
 **⚠️ MUST check before every new release:**
@@ -260,10 +270,10 @@ JSONL is the source of truth for event records; database is the query optimizati
 
 - ✅ **Bundle ID**: `com.javengroup.twentyguard`
 - ✅ **App Name**: "TwentyGuard"
-- ✅ **Version**: 1.5.1
+- ✅ **Version**: 1.5.2
 - ✅ **Minimum macOS**: 12.0
 - ⚠️ **Development Signing**: `make build-app` uses ad-hoc signing for local install/test only
-- ✅ **Public Direct Download**: v1.5.0 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
+- ✅ **Public Direct Download**: v1.5.2 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
 - ✅ **Size**: ~952KB (extremely lightweight)
 
 For direct distribution outside the Mac App Store, Apple requires the app to be
@@ -286,7 +296,7 @@ Do not upload a `make dmg` output as the public release artifact unless it has
 also gone through the Developer ID notarization path.
 
 Latest verified public release artifact:
-- **Path**: `dist/TwentyGuard-v1.5.0.dmg`
-- **Notary submission**: `51800058-d1df-4e2b-a082-78723996cbf6`
+- **Path**: `dist/TwentyGuard-v1.5.2.dmg`
+- **Notary submission**: `22fccf2d-c96d-4b19-9692-2840c9999e95`
 - **Gatekeeper**: accepted, source `Notarized Developer ID`
-- **SHA-256**: `8824ab01248c4534f2ea2c19d758ebff2da68d186b5023022f11274ca2ed0e88`
+- **SHA-256**: `9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f`

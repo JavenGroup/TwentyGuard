@@ -1,6 +1,6 @@
 # TwentyGuard - 功能需求文档
 
-> **文档版本**: v1.5.1
+> **文档版本**: v1.5.2
 > **最后更新**: 2026-05-07
 > **维护者**: Javen Fang (@javenfang)
 
@@ -121,17 +121,21 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 ### 2.3 多语言支持
 
 #### 2.3.1 支持语言
-- 简体中文（默认）
 - English
+- 简体中文
 - Español
 - 日本語
 - 한국어
+
+系统会优先使用用户保存的语言设置；没有保存设置时，会按系统首选语言自动匹配，未匹配语言使用 English。
 
 #### 2.3.2 本地化内容
 - 所有UI文本
 - 休息窗口内容
 - 菜单项
 - 按钮文本（包括快捷键提示）
+- 夜间禁用菜单与状态文本
+- 健康统计窗口主要内容
 
 ### 2.4 系统集成
 
@@ -351,7 +355,7 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 ### 8.1 应用信息
 - **Bundle ID**: com.javengroup.twentyguard
 - **应用名称**: TwentyGuard
-- **版本**: 1.5.1
+- **版本**: 1.5.2
 - **大小**: 约952KB
 
 ### 8.2 分发方式
@@ -362,7 +366,7 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 Gatekeeper 正常放行。开发用 `make dmg` 产物不能作为公开发布产物；公开发布
 必须使用 `make release` 生成签名、公证并 staple 后的 DMG。
 
-v1.5.0 已完成直接分发验证：`TwentyGuard-v1.5.0.dmg` 使用
+v1.5.2 已完成直接分发验证：`TwentyGuard-v1.5.2.dmg` 使用
 `Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)` 的 Developer ID
 签名，通过 Apple notarization，并被 Gatekeeper 接受。
 
@@ -378,6 +382,7 @@ v1.5.0 已完成直接分发验证：`TwentyGuard-v1.5.0.dmg` 使用
 | v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，并补充夜间禁用能力 |
 | v1.5.0 | 2026-05-05 | SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版统计数据不迁移；发布签名公证 DMG |
 | v1.5.1 | 2026-05-07 | 更新 app 图标与状态栏图标资源；补充营销发布资料、渠道草稿和素材清单 |
+| v1.5.2 | 2026-05-07 | 多语言系统迁移到 SwiftPM `.lproj/Localizable.strings` 标准资源；补齐夜间禁用和统计面板翻译；新增多语言完整性测试；发布签名公证 DMG |
 
 ---
 
