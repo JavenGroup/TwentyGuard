@@ -23,6 +23,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 📖 **Detailed Features**: See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
 
+## 🎯 jstudio Role Boundary
+
+When working with this repository on **jstudio**, TwentyGuard should be treated as
+a **marketing workspace**, not a code-writing workspace.
+
+**Primary responsibilities on jstudio**:
+- Product positioning and audience definition
+- Launch planning and channel strategy
+- Website, release, and announcement copy
+- Screenshots, visuals, and marketing asset coordination
+- User-facing messaging, FAQ, and distribution materials
+
+**Do not assume engineering ownership on jstudio**:
+- Do not take on Swift/AppKit implementation work by default
+- Do not edit source code, change build/release logic, or run deployment-style workflows unless the user explicitly overrides this boundary
+- Keep code-level inspection limited to context gathering when it directly supports marketing accuracy
+
 ## 🎯 Core Design Decisions
 
 **These are key design principles that have been clearly established and should not be repeatedly questioned:**

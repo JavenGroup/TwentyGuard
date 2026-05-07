@@ -53,3 +53,7 @@ many similarly named apps. It also makes word-of-mouth awkward: "I use
 - Domain registration availability.
 - Basic trademark search in key launch markets.
 - Search-result review for the exact name and similar spellings.
+
+Record dated results in `evidence/naming-checks.md`. Do not treat this document
+as a live legal or availability check; it captures positioning judgment, not
+current clearance.

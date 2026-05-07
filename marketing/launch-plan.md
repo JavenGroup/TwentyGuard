@@ -2,55 +2,91 @@
 
 ## Goal
 
-Prepare a credible public launch for a small native macOS utility that is useful
-enough for daily use and clear enough for people to recommend.
+Run a credible public launch for a small native macOS utility that is useful
+enough for daily use, easy to understand in one minute, and honest about what it
+does and does not claim.
 
-## Phase 1: Foundation
+## Launch Thesis
 
-- Rename the public app brand and repository to `TwentyGuard`.
-- Update app name, bundle display name, README, screenshots, and release assets.
-- Write a public README that leads with user value, not implementation details.
-- Add a short demo GIF or video showing:
+```text
+Most break reminders are easy to ignore. TwentyGuard is for people who need the
+break to actually happen.
+```
+
+The product is not another wellness dashboard. It is a quiet macOS utility with
+firm guardrails: full-screen breaks, capped postpones, rhythm feedback, and an
+optional night cutoff.
+
+## Current State As Of 2026-05-05
+
+- Brand: `TwentyGuard`.
+- Public subtitle: `Strict 20-20-20 breaks for macOS.`
+- Repository: `https://github.com/JavenGroup/TwentyGuard`.
+- Version: `1.5.0`.
+- Distribution: direct-download DMG is documented as Developer ID signed,
+  Apple-notarized, stapled, and Gatekeeper accepted.
+- Marketing workspace: created, but channel drafts and launch assets are still
+  incomplete.
+
+## Phase 1: Make The Page Trustworthy
+
+- Refresh the README opening with the final launch story if needed.
+- Add current screenshots for the actual v1.5.0 UI.
+- Add a short demo GIF or video showing the complete loop:
   - menu bar countdown,
   - break overlay,
   - postpone limit,
   - health report,
   - night screen lock.
-- Prepare a signed release artifact or clear build instructions.
+- Add a concise limitations section:
+  - not medical advice,
+  - direct-download Mac app,
+  - local-only data storage,
+  - requires macOS 12.0+.
+- Confirm the release download link, checksum, and Gatekeeper note on the public
+  page.
 
-## Phase 2: Proof
+## Phase 2: Prepare Copy Once
 
-- Document that the app is native macOS and local-first.
-- Add screenshots for dark mode and the main workflows.
-- Add a privacy section describing what is stored locally.
-- Add a limitations section so expectations are clear.
-- Add an issue template for bug reports and feature requests.
+Use `copy-bank.md` as the source for:
 
-## Phase 3: Launch Copy
+- one-sentence description,
+- GitHub release note,
+- short social post,
+- longer founder-style story,
+- FAQ,
+- Chinese announcement copy,
+- channel-specific variants.
 
-Prepare these assets before posting:
+Keep the message practical and modest. Do not promise to cure eye strain,
+headaches, sleep issues, or vision problems.
 
-- GitHub README headline.
-- Short announcement post.
-- Longer founder-style story.
-- Screenshot set.
-- Demo GIF/video.
-- FAQ.
-- Comparison positioning against generic break reminders.
+## Phase 3: Verify Launch Risk
 
-## Phase 4: Channels To Evaluate
+Record dated results in `evidence/naming-checks.md` before broad launch:
 
-Validate rules before posting. Channel norms change, and some communities remove
-self-promotion if the post is not framed as useful or transparent.
+- App Store Connect name availability.
+- Domain availability.
+- Basic trademark search in key markets.
+- Search-result review for `TwentyGuard` and similar spellings.
+- Competitor/collision notes for nearby names.
 
-- GitHub release and pinned repository.
-- Hacker News `Show HN`.
-- Reddit communities related to Mac apps, productivity, open source, and eye
-  strain.
-- Product Hunt, if there is a polished landing page and screenshots.
-- Indie Hackers / maker communities.
-- Chinese channels if there is a Chinese landing page or usage story.
-- Personal blog post explaining why strict breaks matter.
+Until those checks are done, keep the launch narrower and GitHub-centered.
+
+## Phase 4: Channel Order
+
+Recommended order:
+
+1. GitHub release and pinned repository.
+2. Personal blog or maker note explaining the problem and design choices.
+3. Chinese community post if a Chinese screenshot set is ready.
+4. Hacker News `Show HN` after the README, screenshots, and direct download flow
+   feel polished.
+5. Product Hunt only if there is a polished landing page, a clean screenshot set,
+   and a short demo video.
+
+Avoid copying the same post across communities. Each channel should answer:
+why this exists, who it is for, and what is different.
 
 ## Phase 5: Feedback Loop
 
@@ -61,13 +97,10 @@ Track:
 - Issues opened.
 - Common setup failures.
 - Repeated feature requests.
-- Which copy gets people to understand the night lock feature.
+- Which copy makes people understand the night screen lock feature.
+- Whether people object to strictness or ask for softer modes.
 
 ## Launch Principle
 
-Do not position this as another gentle reminder app. The sharper story is:
-
-```text
-Most break reminders are easy to ignore. TwentyGuard is for people who need the
-break to actually happen.
-```
+Lead with the behavior change, not the feature list. The feature list supports
+the story; it should not replace it.
