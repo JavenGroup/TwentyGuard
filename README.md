@@ -42,15 +42,8 @@ at night when you need a real boundary.
 3. Drag `TwentyGuard.app` into `Applications`.
 4. Launch TwentyGuard from Applications.
 
-The v1.5.2 DMG is Developer ID signed, Apple-notarized, and accepted by
-Gatekeeper. SHA-256:
-
-```text
-9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f
-```
-
-Local builds created from source may require right-clicking the app and choosing
-**Open** on the first launch.
+The release DMG is Developer ID signed, Apple-notarized, and accepted by
+Gatekeeper.
 
 ## Usage
 

@@ -165,7 +165,8 @@ make launch     # Step 3: Launch new version
 
 ### Version Discipline
 - **Every user-visible app adjustment MUST bump the app version in the same change set.**
-- Treat feature work, UI copy changes, localization changes, icon/resource changes, behavior changes, packaging changes, and release-facing documentation changes as versioned changes.
+- Treat feature work, in-app UI copy changes, localization changes, icon/resource changes, behavior changes, packaging changes, and release artifact changes as versioned changes.
+- Pure README / marketing copy cleanup does not require a new app version if it does not change app behavior, bundled resources, release artifacts, or recorded release facts.
 - For each versioned change, update all version sources together:
   - `Info.plist`: `CFBundleShortVersionString` and `CFBundleVersion`
   - `Sources/TwentyGuard/Resources/version-history.json`: `current_version` and newest history entry
