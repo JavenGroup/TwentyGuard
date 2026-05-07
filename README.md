@@ -19,6 +19,27 @@ their eye breaks. It follows the 20-20-20 rule, supports custom work rhythms,
 limits repeated postpones, reports eye-health patterns, and can lock the screen
 at night when you need a real boundary.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="marketing/assets/menu-main-en-v1.5.2.png" alt="TwentyGuard menu bar controls" width="260">
+    </td>
+    <td align="center" width="33%">
+      <img src="marketing/assets/break-overlay-en-v1.5.2.png" alt="TwentyGuard break overlay with postpone limits" width="320">
+    </td>
+    <td align="center" width="33%">
+      <img src="marketing/assets/health-report-en-v1.5.2.png" alt="TwentyGuard eye health report" width="320">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Menu bar control</strong><br>Modes, postpone limit, language, and night lock.</td>
+    <td align="center"><strong>Strict break overlay</strong><br>Full-screen pause with capped postpones.</td>
+    <td align="center"><strong>Eye health report</strong><br>Verdict-first stats for recent screen rhythm.</td>
+  </tr>
+</table>
+
 ## Features
 
 - **Strict break overlay**: full-screen rest prompts across multiple monitors.

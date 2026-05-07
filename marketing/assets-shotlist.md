@@ -10,27 +10,33 @@ do not yet cover the v1.5.0 launch narrative.
 | --- | --- | --- | --- |
 | Break overlay screenshot | `screenshots/break_reminder.png` | Shows full-screen break behavior | Background context appears old and GitHub-specific. |
 | Menu bar screenshot | `screenshots/menu_bar_interface.png` | Shows menu structure | Does not show night screen lock, health report, or postpone limit. |
+| README menu screenshot | `marketing/assets/menu-main-en-v1.5.2.png` | README and README_CN | Current v1.5.2 menu with postpone limit and night lock entry. |
+| README break screenshot | `marketing/assets/break-overlay-en-v1.5.2.png` | README and README_CN | Current v1.5.2 break overlay with capped postpones. |
+| README health screenshot | `marketing/assets/health-report-en-v1.5.2.png` | README and README_CN | Current v1.5.2 verdict-first health report. |
 | App icon | `marketing/icons/twentyguard-app-icon-1024.png` | README and brand identity | Ready for README; social preview composition still needed. |
 | Menu bar glyph | `Sources/TwentyGuard/Resources/statusbar_icon@2x.png` | In-app status item | Use only as functional UI glyph, not as primary logo. |
-| Marketing asset folder | `marketing/assets/` | Intended destination for launch visuals | Currently empty except `.gitkeep`. |
+| Marketing asset folder | `marketing/assets/` | Intended destination for launch visuals | Now contains README screenshot assets; broader channel assets still needed. |
 
 ## Required Screenshot Set
 
-Capture fresh screenshots from the current v1.5.0 build.
+Capture fresh screenshots from the current v1.5.2 build.
 
 1. Menu bar main menu
-   - Show current countdown.
-   - Show `20-20-20`, custom mode, postpone limit, and night screen lock.
+   - Current README asset exists at `marketing/assets/menu-main-en-v1.5.2.png`.
+   - Shows current countdown, `20-20-20`, custom mode, postpone limit, and
+     night screen lock entry.
    - Use English for GitHub/HN; capture Chinese separately for Chinese channels.
 
 2. Break overlay
-   - Use a neutral desktop or app background.
-   - Show the countdown and three postpone buttons.
-   - Capture a second state where postpone status is visible.
+   - Current README asset exists at `marketing/assets/break-overlay-en-v1.5.2.png`.
+   - Shows countdown, three postpone buttons, and postpone status.
+   - A cleaner neutral-background version would still be useful for broader
+     channel assets.
 
 3. Eye Health Report
-   - Show the verdict-first dashboard.
-   - Prefer sample data that demonstrates completion rate, postpone count, and
+   - Current README asset exists at `marketing/assets/health-report-en-v1.5.2.png`.
+   - Shows the verdict-first dashboard.
+   - Prefer future sample data that demonstrates completion rate, postpone count, and
      seven-day summary without looking alarming.
 
 4. Night Screen Lock

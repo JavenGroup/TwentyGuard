@@ -17,6 +17,27 @@
 TwentyGuard 是一款原生 macOS 菜单栏应用，适合那些明知道该休息、但总会继续盯着屏幕的人。它基于
 20-20-20 护眼法则，支持自定义工作节奏，限制反复推迟，提供眼睛健康统计，并可以在晚上逐步收紧屏幕使用时间，最后进入夜间禁用。
 
+## 产品截图
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="marketing/assets/menu-main-en-v1.5.2.png" alt="TwentyGuard 菜单栏控制" width="260">
+    </td>
+    <td align="center" width="33%">
+      <img src="marketing/assets/break-overlay-en-v1.5.2.png" alt="TwentyGuard 休息遮罩与推迟上限" width="320">
+    </td>
+    <td align="center" width="33%">
+      <img src="marketing/assets/health-report-en-v1.5.2.png" alt="TwentyGuard 眼睛健康报告" width="320">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>菜单栏控制</strong><br>模式、推迟上限、语言和夜间禁用。</td>
+    <td align="center"><strong>强制休息遮罩</strong><br>全屏暂停，并限制反复推迟。</td>
+    <td align="center"><strong>眼睛健康报告</strong><br>先给判断，再看最近节奏。</td>
+  </tr>
+</table>
+
 ## 功能特性
 
 - **强制休息遮罩**：在多个屏幕上显示全屏休息提示。
