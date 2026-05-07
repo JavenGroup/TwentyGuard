@@ -29,8 +29,10 @@ build-app: clean
 	@mkdir -p "$(BUILD_APP)/Contents/Resources"
 	@cp ./.build/release/$(EXECUTABLE) "$(BUILD_APP)/Contents/MacOS/"
 	@cp Info.plist "$(BUILD_APP)/Contents/"
-	@cp -r Sources/TwentyGuard.xcassets "$(BUILD_APP)/Contents/Resources/"
-	@cp -r Sources/TwentyGuard/Resources "$(BUILD_APP)/Contents/Resources/"
+	@printf 'APPL????' > "$(BUILD_APP)/Contents/PkgInfo"
+	@cp Sources/TwentyGuard/Resources/version-history.json "$(BUILD_APP)/Contents/Resources/"
+	@cp Sources/TwentyGuard/Resources/statusbar_icon.png "$(BUILD_APP)/Contents/Resources/"
+	@cp Sources/TwentyGuard/Resources/statusbar_icon@2x.png "$(BUILD_APP)/Contents/Resources/"
 	@if ls ./.build/release/*.bundle >/dev/null 2>&1; then \
 		cp -R ./.build/release/*.bundle "$(BUILD_APP)/Contents/Resources/"; \
 	fi
@@ -38,7 +40,14 @@ build-app: clean
 	@cp Sources/TwentyGuard/Resources/AppIcon.icns "$(BUILD_APP)/Contents/Resources/AppIcon.icns"
 	@echo "🔏 Signing app bundle..."
 	@codesign --force --deep --sign - "$(BUILD_APP)"
+	@./scripts/verify-app-bundle.sh "$(BUILD_APP)"
 	@echo "✅ App bundle created at $(BUILD_APP)"
+
+verify-app-bundle:
+	@./scripts/verify-app-bundle.sh "$(BUILD_APP)"
+
+verify-dmg:
+	@./scripts/verify-dmg.sh "$(DMG)"
 
 check-release-prereqs:
 	@echo "🔎 Checking release signing prerequisites..."
@@ -77,11 +86,13 @@ build-app-release: build-app
 	@echo "🔏 Re-signing app for Developer ID distribution..."
 	@codesign --force --timestamp --options runtime --sign "$(DEVELOPER_ID_APPLICATION)" "$(BUILD_APP)"
 	@codesign --verify --deep --strict --verbose=2 "$(BUILD_APP)"
+	@./scripts/verify-app-bundle.sh "$(BUILD_APP)"
 	@echo "✅ Developer ID app bundle created at $(BUILD_APP)"
 
 # Create distribution DMG
 dmg: build-app
 	@./scripts/create-dmg.sh
+	@./scripts/verify-dmg.sh "$(DMG)"
 
 dmg-release: build-app-release
 	@./scripts/create-dmg.sh
@@ -92,6 +103,7 @@ dmg-release: build-app-release
 	@echo "🔏 Signing DMG for distribution..."
 	@codesign --force --timestamp --sign "$(DEVELOPER_ID_APPLICATION)" "$(DMG)"
 	@codesign --verify --verbose=2 "$(DMG)"
+	@./scripts/verify-dmg.sh "$(DMG)"
 	@echo "✅ Signed DMG created at $(DMG)"
 
 notarize: check-release-prereqs dmg-release
@@ -105,6 +117,8 @@ staple:
 	@echo "✅ Stapled notarized DMG: $(DMG)"
 
 release-verify:
+	@./scripts/verify-app-bundle.sh "$(BUILD_APP)"
+	@./scripts/verify-dmg.sh "$(DMG)"
 	@codesign --verify --deep --strict --verbose=2 "$(BUILD_APP)"
 	@codesign --verify --verbose=2 "$(DMG)"
 	@xcrun stapler validate "$(DMG)"
@@ -133,4 +147,4 @@ launch:
 	@echo "🚀 Launching app from Applications..."
 	@open "$(INSTALL_APP)"
 
-.PHONY: build run clean build-app check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch
+.PHONY: build run clean build-app verify-app-bundle verify-dmg check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch

@@ -1,6 +1,6 @@
 # TwentyGuard - 功能需求文档
 
-> **文档版本**: v1.5.2
+> **文档版本**: v1.5.3
 > **最后更新**: 2026-05-07
 > **维护者**: Javen Fang (@javenfang)
 
@@ -355,8 +355,8 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 ### 8.1 应用信息
 - **Bundle ID**: com.javengroup.twentyguard
 - **应用名称**: TwentyGuard
-- **版本**: 1.5.2
-- **大小**: 约952KB
+- **版本**: 1.5.3
+- **大小**: 约1.3MB
 
 ### 8.2 分发方式
 - 直接分发（Developer ID签名 + Apple notarization 公证）
@@ -366,9 +366,11 @@ TwentyGuard 是一款原生 macOS 菜单栏应用，通过实施 20-20-20 规则
 Gatekeeper 正常放行。开发用 `make dmg` 产物不能作为公开发布产物；公开发布
 必须使用 `make release` 生成签名、公证并 staple 后的 DMG。
 
-v1.5.2 已完成直接分发验证：`TwentyGuard-v1.5.2.dmg` 使用
+v1.5.3 已完成直接分发验证：`TwentyGuard-v1.5.3.dmg` 使用
 `Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)` 的 Developer ID
-签名，通过 Apple notarization，并被 Gatekeeper 接受。
+签名，通过 Apple notarization，并被 Gatekeeper 接受。DMG 根目录包含
+`TwentyGuard.app` 和指向 `/Applications` 的拖拽入口，app bundle 结构由
+`scripts/verify-app-bundle.sh` 和 `scripts/verify-dmg.sh` 自动校验。
 
 ---
 
@@ -383,6 +385,7 @@ v1.5.2 已完成直接分发验证：`TwentyGuard-v1.5.2.dmg` 使用
 | v1.5.0 | 2026-05-05 | SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版统计数据不迁移；发布签名公证 DMG |
 | v1.5.1 | 2026-05-07 | 更新 app 图标与状态栏图标资源；补充营销发布资料、渠道草稿和素材清单 |
 | v1.5.2 | 2026-05-07 | 多语言系统迁移到 SwiftPM `.lproj/Localizable.strings` 标准资源；补齐夜间禁用和统计面板翻译；新增多语言完整性测试；发布签名公证 DMG |
+| v1.5.3 | 2026-05-07 | 修复分发版启动时 SwiftPM resource bundle 查找路径导致的崩溃；补齐标准 app bundle 元数据；新增 app/DMG 打包结构校验和资源查找回归测试；发布签名公证 DMG |
 
 ---
 

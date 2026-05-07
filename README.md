@@ -57,7 +57,7 @@ at night when you need a real boundary.
 
 ## Installation
 
-1. Download the latest `TwentyGuard-v1.5.2.dmg` from
+1. Download the latest `TwentyGuard-v1.5.3.dmg` from
    [Releases](https://github.com/JavenGroup/TwentyGuard/releases).
 2. Open the DMG.
 3. Drag `TwentyGuard.app` into `Applications`.

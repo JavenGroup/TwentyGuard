@@ -43,6 +43,54 @@ final class AppLocalizationTests: XCTestCase {
         XCTAssertEqual(AppLocalization.localized("nightRestriction", language: "ko"), "야간 화면 잠금")
     }
 
+    func testFindsCoreResourceBundleInStandardAppResourcesDirectory() throws {
+        let appURL = temporaryDirectory()
+            .appendingPathComponent("TwentyGuard.app", isDirectory: true)
+        let resourceURL = appURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+        let coreBundleURL = resourceURL
+            .appendingPathComponent(AppLocalization.coreResourceBundleName, isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: coreBundleURL,
+            withIntermediateDirectories: true
+        )
+
+        let resolvedURL = AppLocalization.resolveCoreResourceBundleURL(
+            mainBundleURL: appURL,
+            mainResourceURL: nil,
+            additionalSearchURLs: []
+        )
+
+        XCTAssertEqual(resolvedURL?.standardizedFileURL, coreBundleURL.standardizedFileURL)
+    }
+
+    func testLocalizationTableLoadsFromPackagedResourceBundleURL() throws {
+        let coreBundleURL = temporaryDirectory()
+            .appendingPathComponent(AppLocalization.coreResourceBundleName, isDirectory: true)
+        let englishURL = coreBundleURL.appendingPathComponent("en.lproj", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: englishURL,
+            withIntermediateDirectories: true
+        )
+        try #"""
+        "fixtureKey" = "Fixture Value";
+        """#.write(
+            to: englishURL.appendingPathComponent("Localizable.strings"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let table = AppLocalization.localizationTable(
+            language: "en",
+            resourceBundleURL: coreBundleURL
+        )
+
+        XCTAssertEqual(table["fixtureKey"], "Fixture Value")
+    }
+
     private func formatSpecifiers(in value: String) -> [String] {
         let pattern = "%(?:\\d+\\$)?(?:[0-9.]+)?[@d]"
         let regex = try! NSRegularExpression(pattern: pattern)
@@ -51,5 +99,10 @@ final class AppLocalizationTests: XCTestCase {
         return regex.matches(in: value, range: range).map {
             String(value[Range($0.range, in: value)!])
         }
+    }
+
+    private func temporaryDirectory() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
     }
 }

@@ -190,7 +190,18 @@ make launch     # Step 3: Launch new version
    # Click menu bar → About → Confirm version info is correct
    ```
 
-3. **Example Version Record**:
+3. **Verify App Bundle Structure**:
+   ```bash
+   make build-app
+   make verify-app-bundle
+   ```
+   This must confirm the standard `Contents/Info.plist`, `Contents/PkgInfo`,
+   `Contents/MacOS/TwentyGuard`, runtime resources, SwiftPM resource bundles,
+   localization files, and code signature layout. Do not ship an app bundle that
+   contains `.DS_Store`, source `.xcassets` directories, or SwiftPM resource
+   bundles at the `.app` root.
+
+4. **Example Version Record**:
    ```json
    {
      "version": "1.2.0",
@@ -271,11 +282,11 @@ JSONL is the source of truth for event records; database is the query optimizati
 
 - ✅ **Bundle ID**: `com.javengroup.twentyguard`
 - ✅ **App Name**: "TwentyGuard"
-- ✅ **Version**: 1.5.2
+- ✅ **Version**: 1.5.3
 - ✅ **Minimum macOS**: 12.0
 - ⚠️ **Development Signing**: `make build-app` uses ad-hoc signing for local install/test only
-- ✅ **Public Direct Download**: v1.5.2 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
-- ✅ **Size**: ~952KB (extremely lightweight)
+- ✅ **Public Direct Download**: v1.5.3 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
+- ✅ **Size**: ~1.3MB (extremely lightweight)
 
 For direct distribution outside the Mac App Store, Apple requires the app to be
 signed with a Developer ID certificate and submitted for notarization. The
@@ -297,7 +308,7 @@ Do not upload a `make dmg` output as the public release artifact unless it has
 also gone through the Developer ID notarization path.
 
 Latest verified public release artifact:
-- **Path**: `dist/TwentyGuard-v1.5.2.dmg`
-- **Notary submission**: `22fccf2d-c96d-4b19-9692-2840c9999e95`
+- **Path**: `dist/TwentyGuard-v1.5.3.dmg`
+- **Notary submission**: `691c1c24-24ca-45ba-a7da-efe7a36e13fe`
 - **Gatekeeper**: accepted, source `Notarized Developer ID`
-- **SHA-256**: `9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f`
+- **SHA-256**: `322364e11c50a8ac7bccf71cceeeb136ff0bca338fb077b3664e53511be355cc`

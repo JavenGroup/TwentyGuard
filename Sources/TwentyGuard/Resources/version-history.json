@@ -7,8 +7,19 @@
     "email": "javen.out@gmail.com",
     "github": "JavenGroup/TwentyGuard"
   },
-  "current_version": "1.5.2",
+  "current_version": "1.5.3",
   "versions": [
+    {
+      "version": "1.5.3",
+      "date": "2026-05-07",
+      "changes": [
+        "Fixed the distributed app launch crash caused by SwiftPM resource bundle lookup",
+        "Added standard macOS app bundle metadata to Info.plist",
+        "Added automated app bundle and DMG layout validation for executable, metadata, icons, resource bundles, localization files, and the Applications symlink",
+        "Added regression tests for packaged localization resource lookup",
+        "Published a Developer ID signed and Apple-notarized v1.5.3 DMG for direct download"
+      ]
+    },
     {
       "version": "1.5.2",
       "date": "2026-05-07",

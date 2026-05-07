@@ -1,6 +1,6 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.5.2
+> **文档版本**: v1.5.3
 > **最后更新**: 2026-05-07
 > **维护者**: Javen Fang (@javenfang)
 
@@ -515,16 +515,33 @@ make clean        # 清理构建产物
 
 ### 8.2 构建流程
 
-**Makefile流程** ([`Makefile:11-35`](../Makefile#L11-L35)):
+**Makefile流程** ([`Makefile`](../Makefile)):
 1. 清理旧构建产物
 2. Swift Release编译
 3. 创建 .app 目录结构
 4. 复制可执行文件
-5. 复制资源文件 (Assets + Resources)
-6. 生成 AppIcon.icns
-7. 打包完成
+5. 写入 `Info.plist` 和 `PkgInfo`
+6. 复制运行时资源（图标、状态栏图标、版本历史）
+7. 复制 SwiftPM 生成的 resource bundle 到 `.app/Contents/Resources/`
+8. 进行 ad-hoc 签名
+9. 执行 `scripts/verify-app-bundle.sh` 校验标准 app bundle 结构
+10. 打包完成
 
 **输出位置**: `build/TwentyGuard.app`
+
+**标准 `.app` 内容要求**:
+- `Contents/Info.plist`: 包含 `CFBundlePackageType=APPL`、`CFBundleInfoDictionaryVersion=6.0`、版本号、Bundle ID、最低系统版本等标准元数据
+- `Contents/PkgInfo`: `APPL????`
+- `Contents/MacOS/TwentyGuard`: 主可执行文件
+- `Contents/Resources/AppIcon.icns`: 应用图标
+- `Contents/Resources/statusbar_icon*.png`: 菜单栏图标
+- `Contents/Resources/version-history.json`: About 页面版本历史
+- `Contents/Resources/TwentyGuard_TwentyGuard.bundle`: App target 的 SwiftPM 资源 bundle
+- `Contents/Resources/TwentyGuard_TwentyGuardCore.bundle`: Core target 的 SwiftPM 本地化资源 bundle
+- `Contents/_CodeSignature/CodeResources`: 签名后的代码签名资源清单
+
+构建校验会拒绝缺失上述关键文件、缺失标准 `Info.plist` 字段、SwiftPM resource
+bundle 放错到 `.app` 根目录、`.DS_Store`、以及源码资产目录 `.xcassets`。
 
 ### 8.3 应用签名
 
@@ -536,8 +553,12 @@ make clean        # 清理构建产物
 ```xml
 <key>CFBundleIdentifier</key>
 <string>com.javengroup.twentyguard</string>
+<key>CFBundlePackageType</key>
+<string>APPL</string>
+<key>CFBundleInfoDictionaryVersion</key>
+<string>6.0</string>
 <key>CFBundleVersion</key>
-<string>1.5.2</string>
+<string>1.5.3</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -561,12 +582,12 @@ make release \
 5. stapler 写入公证票据
 6. 使用 `codesign`、`spctl` 和 `stapler validate` 验证发布产物
 
-**v1.5.2 发布验证结果**:
+**v1.5.3 发布验证结果**:
 - Developer ID: `Developer ID Application: Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)`
-- Notary submission: `22fccf2d-c96d-4b19-9692-2840c9999e95`
+- Notary submission: `691c1c24-24ca-45ba-a7da-efe7a36e13fe`
 - Gatekeeper: `accepted`, source `Notarized Developer ID`
-- 发布产物: `dist/TwentyGuard-v1.5.2.dmg`
-- SHA-256: `9d85e28dda9878a1e37fd24c0438aee35f070ac769881530bd180db3ba277c7f`
+- 发布产物: `dist/TwentyGuard-v1.5.3.dmg`
+- SHA-256: `322364e11c50a8ac7bccf71cceeeb136ff0bca338fb077b3664e53511be355cc`
 
 ### 8.4 版本管理
 
@@ -791,6 +812,7 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 | v1.5.0 | 2026-05-05 | 内部 SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版本地数据不迁移；发布 Developer ID 签名并公证的 DMG |
 | v1.5.1 | 2026-05-07 | 更新 app 图标与状态栏图标资源；补充营销发布资料、渠道草稿和素材清单 |
 | v1.5.2 | 2026-05-07 | 多语言系统迁移到 SwiftPM `.lproj/Localizable.strings` 标准资源；补齐夜间禁用和统计面板翻译；新增多语言完整性测试；发布 Developer ID 签名并公证的 DMG |
+| v1.5.3 | 2026-05-07 | 修复分发版启动时 SwiftPM resource bundle 查找路径导致的崩溃；补齐标准 app bundle 元数据；新增 app/DMG 打包结构校验和资源查找回归测试；发布签名公证 DMG |
 
 ### B. 相关文档
 
@@ -807,4 +829,4 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 ---
 
 **最后更新**: 2026-05-07
-**文档版本**: v1.5.2
+**文档版本**: v1.5.3
