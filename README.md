@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![TwentyGuard status bar icon](Sources/TwentyGuard/Resources/statusbar_icon@2x.png)
+<img src="marketing/icons/twentyguard-app-icon-1024.png" width="96" alt="TwentyGuard app icon">
 
 **Strict 20-20-20 breaks for macOS.**
 

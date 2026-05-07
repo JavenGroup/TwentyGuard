@@ -25,12 +25,15 @@ optional night cutoff.
 - Version: `1.5.0`.
 - Distribution: direct-download DMG is documented as Developer ID signed,
   Apple-notarized, stapled, and Gatekeeper accepted.
+- Website: not planned for the current launch scope.
 - Marketing workspace: created, but channel drafts and launch assets are still
   incomplete.
 
 ## Phase 1: Make The Page Trustworthy
 
 - Refresh the README opening with the final launch story if needed.
+- Use the app icon as the README brand mark; keep the status bar glyph limited
+  to menu bar UI.
 - Add current screenshots for the actual v1.5.0 UI.
 - Add a short demo GIF or video showing the complete loop:
   - menu bar countdown,
@@ -82,8 +85,7 @@ Recommended order:
 3. Chinese community post if a Chinese screenshot set is ready.
 4. Hacker News `Show HN` after the README, screenshots, and direct download flow
    feel polished.
-5. Product Hunt only if there is a polished landing page, a clean screenshot set,
-   and a short demo video.
+5. Defer Product Hunt while there is no website or landing-page plan.
 
 Avoid copying the same post across communities. Each channel should answer:
 why this exists, who it is for, and what is different.

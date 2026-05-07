@@ -10,6 +10,8 @@ do not yet cover the v1.5.0 launch narrative.
 | --- | --- | --- | --- |
 | Break overlay screenshot | `screenshots/break_reminder.png` | Shows full-screen break behavior | Background context appears old and GitHub-specific. |
 | Menu bar screenshot | `screenshots/menu_bar_interface.png` | Shows menu structure | Does not show night screen lock, health report, or postpone limit. |
+| App icon | `marketing/icons/twentyguard-app-icon-1024.png` | README and brand identity | Ready for README; social preview composition still needed. |
+| Menu bar glyph | `Sources/TwentyGuard/Resources/statusbar_icon@2x.png` | In-app status item | Use only as functional UI glyph, not as primary logo. |
 | Marketing asset folder | `marketing/assets/` | Intended destination for launch visuals | Currently empty except `.gitkeep`. |
 
 ## Required Screenshot Set
@@ -60,15 +62,22 @@ Keep the video quiet and direct. The product is a utility, not a cinematic app.
 
 Recommended exports:
 
+- README app icon: 96-128 px rendered from `marketing/icons/twentyguard-app-icon-1024.png`.
 - README hero screenshot: 1600 px wide.
 - GitHub inline screenshots: 1200-1600 px wide.
 - Social preview: 1200 x 630.
 - Product Hunt gallery, if used later: 1270 x 760.
 - Chinese community post images: 1600 px wide, Chinese UI preferred.
 
+Website assets such as favicon and website Open Graph images are not planned
+for now. Keep the current asset work focused on GitHub, release notes, direct
+download trust, and community posts.
+
 ## Visual Guidelines
 
 - Use the real app UI, not mockups, for trust.
+- Use the app icon for brand identity; use the status bar glyph only when the
+  asset is specifically about the menu bar.
 - Avoid busy or identifiable background content.
 - Keep text readable at GitHub README width.
 - Do not crop away the menu bar when the menu bar is the feature.

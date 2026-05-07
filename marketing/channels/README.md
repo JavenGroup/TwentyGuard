@@ -12,7 +12,6 @@ should have its own angle, not a pasted copy of the same announcement.
 ## Drafts To Add Later
 
 - `reddit.md` - subreddit-specific drafts and rule checks.
-- `product-hunt.md` - launch checklist and asset list.
 - `blog.md` - founder-style story and product design rationale.
 
 Before posting anywhere, check the current channel rules and adapt the post to
@@ -26,5 +25,4 @@ the community. Do not blast the same copy everywhere.
   with a transparent builder note.
 - Chinese channels: useful if Chinese screenshots and a practical usage story
   are ready.
-- Product Hunt: wait until there is a proper landing page, gallery, and demo
-  video.
+- Product Hunt: deferred while there is no website or landing-page plan.

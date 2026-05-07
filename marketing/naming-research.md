@@ -3,7 +3,7 @@
 ## Final Decision
 
 Use `TwentyGuard` as the public brand and keep `20-20-20` in the subtitle,
-README keywords, website title, and App Store metadata.
+README keywords, release copy, and App Store metadata.
 
 Recommended public line:
 
@@ -23,7 +23,8 @@ many similarly named apps. It also makes word-of-mouth awkward: "I use
 - Keeps the `Twenty` association with the 20-20-20 rule.
 - Adds the product's real differentiation: guardrails and enforcement.
 - Works for both break enforcement and night screen lock.
-- Short enough for a menu bar app, GitHub repo, landing page, and App Store name.
+- Short enough for a menu bar app, GitHub repo, future website, and App Store
+  name.
 - More distinctive than generic names like `Eye Break`, `Eye Timer`, or
   `Screen Rest`.
 

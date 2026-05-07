@@ -27,6 +27,7 @@ Status labels:
 | Chinese README | Done | Useful for China/community launch. |
 | Screenshot set | Missing | Current screenshots are partial and appear older than v1.5.0 messaging. |
 | Demo GIF/video | Missing | Needed to show strict overlay and postpone limit quickly. |
+| README app icon | Done | README and README_CN use the stable app icon export, not the status bar glyph. |
 | FAQ | Missing | Draft in `copy-bank.md`; should be promoted when stable. |
 | Limitations section | Missing | Should explicitly avoid medical claims and explain direct-download expectations. |
 | Issue template | Optional | Useful before broader traffic. |
@@ -40,7 +41,9 @@ Status labels:
 | Health report screenshot | Missing | Important for differentiating from simple timers. |
 | Night screen lock screenshot | Missing | Important for the sharper story. |
 | DMG/install screenshot | Optional | Useful for direct-download trust. |
-| App icon export | Needs organization | Source exists, but marketing-ready exports should live in `marketing/assets/`. |
+| App icon export | Done | Stable export lives at `marketing/icons/twentyguard-app-icon-1024.png`. |
+| Status bar glyph | Done | Stronger solid template glyph is installed in app resources. |
+| GitHub social preview | Missing | Should use app icon plus name/tagline; no website is planned for now. |
 
 ## Market And Naming Risk
 
@@ -59,7 +62,7 @@ Status labels:
 | Hacker News | Drafted | See `channels/hacker-news.md`; verify current Show HN norms before posting. |
 | Chinese channels | Drafted | See `channels/china.md`; needs Chinese screenshots. |
 | Reddit | Missing | Should be subreddit-specific, not a generic cross-post. |
-| Product Hunt | Optional | Wait until landing page, visuals, and demo video are stronger. |
+| Product Hunt | Deferred | No website/landing-page plan for now; revisit only if launch scope expands. |
 
 ## Recommended Next Step
 

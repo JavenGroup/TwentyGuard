@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![TwentyGuard 状态栏图标](Sources/TwentyGuard/Resources/statusbar_icon@2x.png)
+<img src="marketing/icons/twentyguard-app-icon-1024.png" width="96" alt="TwentyGuard 应用图标">
 
 **严格执行 20-20-20 护眼休息的 macOS 菜单栏应用。**
 

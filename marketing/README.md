@@ -56,7 +56,8 @@ screen lock.
 - `assets-shotlist.md` - screenshots, demo video/GIF, and visual asset requirements.
 - `channels/` - channel-specific posting notes and draft prompts.
 - `evidence/` - dated evidence for naming, domain, App Store, trademark, and search checks.
-- `assets/` - screenshots, icons, short videos, and other launch materials.
+- `assets/` - screenshots, short videos, and other launch materials.
+- `icons/` - app icon, menu bar glyph, icon previews, and brand usage notes.
 
 ## Operating Rules
 
@@ -72,6 +73,7 @@ screen lock.
 ## Next Useful Passes
 
 1. Capture a fresh screenshot set for the current v1.5.0 UI.
-2. Turn `copy-bank.md` into the final GitHub release and README announcement copy.
-3. Fill `evidence/naming-checks.md` with dated checks before broad launch.
-4. Pick one first public channel and tailor the draft instead of posting everywhere.
+2. Use the app icon, not the menu bar glyph, as the README and release identity.
+3. Turn `copy-bank.md` into the final GitHub release and README announcement copy.
+4. Fill `evidence/naming-checks.md` with dated checks before broad launch.
+5. Pick one first public channel and tailor the draft instead of posting everywhere.
