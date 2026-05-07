@@ -260,7 +260,7 @@ JSONL is the source of truth for event records; database is the query optimizati
 
 - ✅ **Bundle ID**: `com.javengroup.twentyguard`
 - ✅ **App Name**: "TwentyGuard"
-- ✅ **Version**: 1.5.0
+- ✅ **Version**: 1.5.1
 - ✅ **Minimum macOS**: 12.0
 - ⚠️ **Development Signing**: `make build-app` uses ad-hoc signing for local install/test only
 - ✅ **Public Direct Download**: v1.5.0 DMG is Developer ID signed, notarized, stapled, and Gatekeeper accepted
@@ -280,12 +280,12 @@ make release \
   DEVELOPER_ID_APPLICATION="Developer ID Application: Shenzhen Lifangjuzhen Technology Co., Ltd. (MDQ5F44RU5)"
 ```
 
-`make release` builds `dist/TwentyGuard-v1.5.0.dmg`, signs the app and DMG,
+`make release` builds the versioned `dist/TwentyGuard-v<version>.dmg`, signs the app and DMG,
 submits the DMG for notarization, staples the ticket, and verifies Gatekeeper.
 Do not upload a `make dmg` output as the public release artifact unless it has
 also gone through the Developer ID notarization path.
 
-Latest verified release artifact:
+Latest verified public release artifact:
 - **Path**: `dist/TwentyGuard-v1.5.0.dmg`
 - **Notary submission**: `51800058-d1df-4e2b-a082-78723996cbf6`
 - **Gatekeeper**: accepted, source `Notarized Developer ID`

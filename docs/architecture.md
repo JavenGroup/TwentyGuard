@@ -1,7 +1,7 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.5.0
-> **最后更新**: 2026-05-05
+> **文档版本**: v1.5.1
+> **最后更新**: 2026-05-07
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -529,7 +529,7 @@ make clean        # 清理构建产物
 <key>CFBundleIdentifier</key>
 <string>com.javengroup.twentyguard</string>
 <key>CFBundleVersion</key>
-<string>1.5.0</string>
+<string>1.5.1</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -781,6 +781,7 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 | v1.2.0 | 2026-04-26 | 默认推迟上限降为 5 分钟，自定义模式支持 5/10 分钟上限 |
 | v1.4.0 | 2026-05-03 | 公开品牌迁移为 TwentyGuard，更新 bundle 元数据、构建产物和发布路径 |
 | v1.5.0 | 2026-05-05 | 内部 SwiftPM target、可执行文件和本地数据路径统一为 TwentyGuard；旧版本地数据不迁移；发布 Developer ID 签名并公证的 DMG |
+| v1.5.1 | 2026-05-07 | 更新 app 图标与状态栏图标资源；补充营销发布资料、渠道草稿和素材清单 |
 
 ### B. 相关文档
 
@@ -796,5 +797,5 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 
 ---
 
-**最后更新**: 2026-05-05
-**文档版本**: v1.5.0
+**最后更新**: 2026-05-07
+**文档版本**: v1.5.1
