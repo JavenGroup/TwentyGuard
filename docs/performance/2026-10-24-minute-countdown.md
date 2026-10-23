@@ -1,6 +1,6 @@
 # Minute countdown and independent deadlines: 2026-10-24
 
-The user selected minute-level work countdowns. This record describes the local **1.7.10 candidate**, performance-measured implementation commit `9365663e73036e8e77372507e3b1ff898110f958` plus the subsequent stale-overlay cleanup fix, based on `839908d` / installed 1.7.9. It is ready for coordinator review, with no push, main-branch merge, candidate installation, public release, or DMG upload performed.
+The user selected minute-level work countdowns. This record describes the local **1.7.10 candidate**, performance-measured implementation commit `9365663e73036e8e77372507e3b1ff898110f958` plus the subsequent stale-overlay cleanup fix, based on `839908d` / installed 1.7.9. Coordinator review subsequently approved `fef639e8d06018e07d0acce08d38cba8979eaad5`; the final section records landing and local installation. No public release or DMG upload was performed.
 
 ## Result and behavior
 
@@ -83,4 +83,21 @@ Performance-measured executable SHA-256: `4809e23176067b564cc69a04f2fa3917919be6
 
 The orchestration source (`compare.py`), Foundation preference probe, raw CPU/wakeup JSON, callback traces, state/event fixtures, red/green/lifecycle test logs, build log, native profiles and the integrity manifest are preserved in `build/performance/2026-10-24-minute-countdown/` in this worktree. They are ignored machine-local artifacts. `summary.json`, `comparison.json`, `functional.json` and `real-data-integrity.json` provide the compact review entry points.
 
-The final rebuilt candidate is separately identified in `final-verification.json`; only the stale-overlay cleanup branch and its tests changed after performance measurement. The implementation and evidence are ready for final independent coordinator review. The candidate has not been merged, pushed, installed or publicly released.
+The final rebuilt candidate is separately identified in `final-verification.json`; only the stale-overlay cleanup branch and its tests changed after performance measurement. The implementation passed independent coordinator review and was subsequently landed and locally installed as recorded below. No public release was performed.
+
+
+## Reviewed landing and installed verification
+
+The coordinator independently reviewed the complete change and both lifecycle edge fixes, ran the Countdown group (25 tests, one designed skip, zero failures), and ran the isolated AppDelegate lifecycle test including unshown-overlay cleanup (one test, zero failures). The verified primary checkout fast-forwarded `main` from `839908d` to **`fef639e8d06018e07d0acce08d38cba8979eaad5`**, pushed normally, and read back that exact remote revision. No unrelated local or remote work was overwritten.
+
+`make install` rebuilt from the primary checkout and `make launch` started **1.7.10**, PID **64186**, from `/Applications/TwentyGuard.app/Contents/MacOS/TwentyGuard`. Installed bundle metadata and version history match; bundle structure and strict signature checks passed. The installed executable exactly matches the primary build, SHA-256 **`7e63541b3a58bf1ef737d8fca724a5927cf9bc161eef67e3bef2a5e5177d07e9`**. Its environment has neither `CFFIXED_USER_HOME` nor the timing-probe override.
+
+All **15 preference keys/values** are identical, including the show/hide setting. All **3,942 preexisting session rows** and **66 preexisting stats-event rows** remain value-for-value identical, and SQLite `quick_check` returns `ok`. The initial post-install validation confirmed that all **141 existing JSONL file prefixes** remained intact; new lifecycle records append normally.
+
+The pre-install session was already marked system-paused and had no active work start. Launch correctly started a fresh cycle under the existing recovery rule. Later display-wake, screensaver-stop and screen-unlock events produced the existing fresh-cycle behavior; new lifecycle rows are expected, while all preexisting rows were retained. The work/break durations, custom mode and ten-second snapshots remained intact.
+
+A separate real-profile post-install observation measured three consecutive five-second CPU windows of **0.0518%, 0.0000%, and 0.0276%**, mean **0.02646%**. Interrupt wakeups were 1, 0 and 1, and normal snapshot writes remained present. The coordinator independently observed 0.000% / 0.031% in two further five-second windows. A zero-valued short window is not a claim of permanently zero CPU usage.
+
+Native binding of this menu-bar app timed out, so its installed on-screen label was not directly captured. Minute text had already been verified from the actual isolated app's status-button title (`26 min` → `25 min`). Installed process/version, code identity, real profile, session snapshots and low runtime overhead were verified; this is not a claim of manual UI acceptance.
+
+Installation logs, pre-install SQLite/preferences/session backups, post-install row comparison, process/environment evidence and CPU samples are in `build/performance/2026-10-24-minute-countdown/install/`. Machine-local evidence is retained in both the primary checkout and the managed worktree. Only this verification record changed after the installed code revision; the task branch can be safely retired while retaining the worktree.
