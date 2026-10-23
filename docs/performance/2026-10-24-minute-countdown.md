@@ -1,6 +1,6 @@
 # Minute countdown and independent deadlines: 2026-10-24
 
-The user selected minute-level work countdowns. This record describes the local **1.7.10 candidate**, implementation commit `9365663e73036e8e77372507e3b1ff898110f958`, based on `839908d` / installed 1.7.9. It is ready for coordinator review, with no push, main-branch merge, candidate installation, public release, or DMG upload performed.
+The user selected minute-level work countdowns. This record describes the local **1.7.10 candidate**, performance-measured implementation commit `9365663e73036e8e77372507e3b1ff898110f958` plus the subsequent stale-overlay cleanup fix, based on `839908d` / installed 1.7.9. It is ready for coordinator review, with no push, main-branch merge, candidate installation, public release, or DMG upload performed.
 
 ## Result and behavior
 
@@ -16,6 +16,7 @@ Both kinds of timer and the unchanged ten-second snapshot heartbeat run in commo
 - Deterministic simulation: two ordinary work minutes produce **2 display callbacks and 0 deadline polls**; a full 1,500-second work cycle produces **83–84 display callbacks and exactly one work deadline**. Hidden countdowns still complete at the same exact deadline. Open-menu seconds reuse the same action timer.
 - Tests cover simultaneous display/action times, stale callback cancellation, restoration without orphan timers, clock rearming, every night tightening stage, lock/unlock, override expiry, a fresh Calendar after a time-zone change, DST, display sleep, and fractional work/rest/postpone/disable boundaries.
 - Coordinator pre-review found an actual temporary-disable wake regression: cancelling the old scheduler followed by a handled early return lost the expiry. An isolated **AppDelegate** test reproduced this with two failed assertions after the real `systemWillSleep` / `systemDidWake` methods. Rebuilding schedules on handled returns and related cancellation paths made that same test pass. This verifies the lifecycle bridge, not just the pure plan.
+- Final edge regression: an unshown night overlay with an already-normal policy initially retained a later deadline and failed two lifecycle assertions. The plan now schedules immediate cleanup, and the action handler prioritizes removing that stale overlay before a still-active temporary disable. The same event-tracking lifecycle test passes and confirms the disable expiry survives cleanup. No host-clock change or visible lock overlay was used. This cleanup-only follow-up does not change ordinary-work display frequency; the completed performance comparison was retained.
 - `make test`: **92 tests, zero failures, one intentional isolation skip**. `make test-lifecycle`: **one lifecycle test passed** under a new temporary home with real preferences/product writes denied. The test refuses to initialize AppDelegate unless home and preference isolation are verified.
 - `make build-app`, `make verify-app-bundle` and strict code-signature verification passed. Info.plist, bundled history, development guide and current architecture/requirements sources identify 1.7.10.
 
@@ -78,8 +79,8 @@ Final measurement homes:
 - Baseline: `/var/folders/ds/z4wlpr957r109vjdvjrxjwpc0000gp/T/twentyguard-minute-baseline-2yx39scf`
 - Candidate: `/var/folders/ds/z4wlpr957r109vjdvjrxjwpc0000gp/T/twentyguard-minute-candidate-v85l2ppo`
 
-Candidate executable SHA-256: `4809e23176067b564cc69a04f2fa3917919be62fd26d0e2f8025c0eb0b580795`.
+Performance-measured executable SHA-256: `4809e23176067b564cc69a04f2fa3917919be62fd26d0e2f8025c0eb0b580795`.
 
 The orchestration source (`compare.py`), Foundation preference probe, raw CPU/wakeup JSON, callback traces, state/event fixtures, red/green/lifecycle test logs, build log, native profiles and the integrity manifest are preserved in `build/performance/2026-10-24-minute-countdown/` in this worktree. They are ignored machine-local artifacts. `summary.json`, `comparison.json`, `functional.json` and `real-data-integrity.json` provide the compact review entry points.
 
-The implementation and evidence are ready for final independent coordinator review. The candidate has not been merged, pushed, installed or publicly released.
+The final rebuilt candidate is separately identified in `final-verification.json`; only the stale-overlay cleanup branch and its tests changed after performance measurement. The implementation and evidence are ready for final independent coordinator review. The candidate has not been merged, pushed, installed or publicly released.

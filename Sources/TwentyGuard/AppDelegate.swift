@@ -413,7 +413,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func countdownPlan(now: Date, status: NightRestrictionStatus) -> CountdownPlan {
         let phase: CountdownPhase
-        if status.isLocked {
+        if !nightLockOverlays.isEmpty && !status.isLocked {
+            // Creating a window can straddle unlock (or a clock change). Its old lock still
+            // needs an action callback even though the policy already reports normal.
+            phase = .nightLocked(until: now)
+        } else if status.isLocked {
             phase = .nightLocked(until: status.schedule.unlockTime)
         } else if let state = temporaryDisableState {
             phase = .temporarilyDisabled(until: state.until)
@@ -473,7 +477,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func handleCountdownDeadline() {
         traceCountdownTiming(event: "deadline")
         clearExpiredNightOverride()
-        if temporaryDisableState != nil {
+        if !nightLockOverlays.isEmpty && !currentNightStatus().isLocked {
+            updateNightLockTimer()
+        } else if temporaryDisableState != nil {
             updateTemporaryDisableTimer()
         } else if !nightLockOverlays.isEmpty {
             updateNightLockTimer()
@@ -514,11 +520,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     #if DEBUG
     var countdownScheduleForTesting: CountdownPlan { countdownScheduler.scheduledPlan }
+    var hasNightOverlayForTesting: Bool { !nightLockOverlays.isEmpty }
+
+    func setUnshownNightOverlayForTesting(_ overlay: NightRestrictionOverlayWindow) {
+        precondition(!overlay.isVisible)
+        nightLockOverlays = [overlay]
+        rescheduleCountdown()
+    }
 
     func stopCountdownForTesting() {
         schedulingReady = false
         countdownScheduler.cancel()
         stateSnapshotTimer?.invalidate()
+        for overlay in nightLockOverlays { overlay.hideOverlay() }
+        nightLockOverlays.removeAll()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default.removeObserver(self)
         NotificationCenter.default.removeObserver(self)

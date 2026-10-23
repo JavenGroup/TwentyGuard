@@ -42,5 +42,22 @@ final class CountdownLifecycleTests: XCTestCase {
         XCTAssertEqual(delegate.countdownScheduleForTesting.deadline, until,
                        "Wake must rebuild temporary-disable expiry after cancelling old timers")
         XCTAssertNotNil(delegate.countdownScheduleForTesting.display)
+
+        // Window creation can straddle unlock. Seed an unshown stale overlay while policy is
+        // already normal and temporary disable remains active; cleanup must take priority.
+        let screen = try XCTUnwrap(NSScreen.screens.first)
+        let overlay = NightRestrictionOverlayWindow(screen: screen)
+        XCTAssertFalse(overlay.isVisible)
+        delegate.setUnshownNightOverlayForTesting(overlay)
+        let cleanup = try XCTUnwrap(delegate.countdownScheduleForTesting.deadline)
+        XCTAssertLessThanOrEqual(cleanup, Date().addingTimeInterval(0.1),
+                                 "A stale night overlay needs immediate cleanup, not the next night boundary")
+        let limit = Date().addingTimeInterval(0.5)
+        while delegate.hasNightOverlayForTesting && Date() < limit {
+            RunLoop.main.run(mode: .eventTracking, before: limit)
+        }
+        XCTAssertFalse(delegate.hasNightOverlayForTesting)
+        XCTAssertEqual(delegate.countdownScheduleForTesting.deadline, until,
+                       "Night cleanup must preserve the temporary-disable expiry")
     }
 }
