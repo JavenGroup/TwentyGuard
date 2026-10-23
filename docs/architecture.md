@@ -1,7 +1,7 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.7.8
-> **最后更新**: 2026-05-24
+> **文档版本**: v1.7.9
+> **最后更新**: 2026-10-23
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -552,11 +552,16 @@ v1.7.6 起，`session_debug` 记录关键会话诊断动作，常见 `action` �
 - `AppLocalization` 统一负责语言检测、字符串查找和兜底策略
 - `AppDelegate.localized(_:)` 只保留薄封装，UI 文本不再维护内联 Swift 字典
 - `Makefile` 会复制 SwiftPM 生成的 resource bundle 到 `.app/Contents/Resources/`
+- 优先定位正式 app 的资源包；只有正式路径缺失时才执行 SwiftPM 开发目录发现
+- 默认资源位置（包括未找到的结果）和各语言表（包括空表）按进程缓存，`NSLock` 保证首次并发查询只加载一次
+- 运行时按语言代码选择缓存表，回退顺序保持为所选语言 → 简体中文 → English → 原 key
+- 显式 `resourceBundleURL` 由调用方管理，每次独立读取，不写入默认缓存；默认资源在进程运行期间视为不可变
 
 **测试保护**:
 - `AppLocalizationTests` 校验 5 种语言的 key 完全一致
 - `AppLocalizationTests` 校验所有本地化格式占位符一致，避免 `%@` / `%d` / `%%` 运行时格式错误
 - `StatsHealthVerdictTests` 覆盖健康判断文案在中文 localizer 下的输出
+- `LocalizationStoreTests` 覆盖重复/并发查询、空结果缓存、语言回退、开发路径延迟发现和显式资源隔离
 
 ### 7.3 语言切换
 
@@ -577,6 +582,8 @@ v1.7.6 起，`session_debug` 记录关键会话诊断动作，常见 `action` �
 ### 8.1 构建系统
 
 **Swift Package Manager** + **Makefile**
+
+Makefile 明确使用 `--build-system native`，保持既有扁平 SwiftPM resource bundle 布局，与资源读取和打包校验一致。
 
 **关键命令**:
 ```bash
@@ -631,7 +638,7 @@ bundle 放错到 `.app` 根目录、`.DS_Store`、以及源码资产目录 `.xca
 <key>CFBundleInfoDictionaryVersion</key>
 <string>6.0</string>
 <key>CFBundleVersion</key>
-<string>1.7.8</string>
+<string>1.7.9</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -662,8 +669,8 @@ make release \
 - 发布产物: `dist/TwentyGuard-v1.5.3.dmg`
 - SHA-256: `322364e11c50a8ac7bccf71cceeeb136ff0bca338fb077b3664e53511be355cc`
 
-v1.7.8 当前为功能实现版本；公开分发前需要重新执行 `make release`，生成签名、
-公证并 staple 后的 `dist/TwentyGuard-v1.7.8.dmg`，再更新本节发布验证结果。
+v1.7.9 当前为功能实现版本；公开分发前需要重新执行 `make release`，生成签名、
+公证并 staple 后的 `dist/TwentyGuard-v1.7.9.dmg`，再更新本节发布验证结果。
 
 ### 8.4 版本管理
 
@@ -914,6 +921,7 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 | v1.7.6 | 2026-05-24 | 新增 `session_debug` JSONL 诊断事件；StatsDatabase 支持注入 debug logger；会话恢复、系统暂停/唤醒、工作会话复用、休息挂载和休息完成均带结构化定位字段；本机旧运行数据已清理后重新开始 |
 | v1.7.7 | 2026-05-24 | 休息完成后强制进入新的 work session，并清理残留 postpone 状态；避免主动休息完成后沿用旧周期导致几分钟后再次休息；新增 SessionState 回归测试和对应 `session_debug` action |
 | v1.7.8 | 2026-05-24 | 系统暂停时立即闭合 active session，清空本地计时状态并持续保存 paused 标记；统计层按计划时长 + 推迟 + 宽限排除异常长 session，避免锁屏/屏保时间污染最长连续工作 |
+| v1.7.9 | 2026-10-23 | 缓存语言资源位置与各语言表，正式 app 优先查找并延迟开发目录发现，降低倒计时 CPU 开销；新增缓存、回退、并发及资源隔离回归测试 |
 
 ### B. 相关文档
 
@@ -929,5 +937,5 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 
 ---
 
-**最后更新**: 2026-05-24
-**文档版本**: v1.7.8
+**最后更新**: 2026-10-23
+**文档版本**: v1.7.9

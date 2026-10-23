@@ -7,8 +7,16 @@
     "email": "javen.out@gmail.com",
     "github": "JavenGroup/TwentyGuard"
   },
-  "current_version": "1.7.8",
+  "current_version": "1.7.9",
   "versions": [
+    {
+      "version": "1.7.9",
+      "date": "2026-10-23",
+      "changes": [
+        "Reduced countdown CPU usage by caching the app localization resource location and language tables instead of repeatedly scanning build directories and rereading translations",
+        "Kept runtime language switching and missing-key fallback intact, with thread-safe caching and independent explicit resource lookups"
+      ]
+    },
     {
       "version": "1.7.8",
       "date": "2026-05-24",

@@ -1,4 +1,5 @@
-SWIFT_BUILD_FLAGS ?= --disable-sandbox --cache-path .build/cache --config-path .build/config --scratch-path .build
+# Keep the established flat SwiftPM resource layout used by the app packager.
+SWIFT_BUILD_FLAGS ?= --build-system native --disable-sandbox --cache-path .build/cache --config-path .build/config --scratch-path .build
 APP_NAME := TwentyGuard
 EXECUTABLE := TwentyGuard
 BUILD_APP := build/$(APP_NAME).app
@@ -9,12 +10,22 @@ APPLE_ID ?=
 TEAM_ID ?=
 DEVELOPER_ID_APPLICATION ?=
 NOTARY_PROFILE ?= TwentyGuardNotary
+LOCALIZATION_BENCHMARK_BUNDLE ?= $(BUILD_APP)/Contents/Resources/TwentyGuard_TwentyGuardCore.bundle
+LOCALIZATION_BENCHMARK_ITERATIONS ?= 30
 
 build:
 	swift build $(SWIFT_BUILD_FLAGS) -c release
 
 run:
 	swift run $(SWIFT_BUILD_FLAGS)
+
+test:
+	swift test $(SWIFT_BUILD_FLAGS) $(TEST_FLAGS)
+
+benchmark-localization:
+	@mkdir -p build
+	swiftc -O Sources/TwentyGuardCore/AppLocalization.swift scripts/LocalizationBenchmark/main.swift -o build/localization-benchmark
+	build/localization-benchmark "$(LOCALIZATION_BENCHMARK_BUNDLE)" $(LOCALIZATION_BENCHMARK_ITERATIONS)
 
 clean:
 	swift package clean
@@ -147,4 +158,4 @@ launch:
 	@echo "🚀 Launching app from Applications..."
 	@open "$(INSTALL_APP)"
 
-.PHONY: build run clean build-app verify-app-bundle verify-dmg check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch
+.PHONY: build run test benchmark-localization clean build-app verify-app-bundle verify-dmg check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch

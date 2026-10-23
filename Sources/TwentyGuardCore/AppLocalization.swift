@@ -7,6 +7,11 @@ public enum AppLocalization {
 
     public static let supportedLanguageCodes = ["zh-Hans", "en", "es", "ja", "ko"]
 
+    private static let defaultStore = LocalizationStore(
+        resourceBundleResolver: { resolveCoreResourceBundleURL() },
+        tableLoader: loadLocalizationTable
+    )
+
     public static let languageDisplayNames: [(code: String, name: String)] = [
         ("zh-Hans", "简体中文"),
         ("en", "English"),
@@ -38,19 +43,7 @@ public enum AppLocalization {
     }
 
     public static func localized(_ key: String, language: String) -> String {
-        if let value = localizationTable(language: language)[key] {
-            return value
-        }
-
-        if let value = localizationTable(language: fallbackLanguageCode)[key] {
-            return value
-        }
-
-        if let value = localizationTable(language: defaultLanguageCode)[key] {
-            return value
-        }
-
-        return key
+        defaultStore.localized(key, language: language)
     }
 
     public static func localizationKeys(language: String) -> Set<String> {
@@ -58,10 +51,14 @@ public enum AppLocalization {
     }
 
     public static func localizationTable(language: String, resourceBundleURL: URL? = nil) -> [String: String] {
-        guard let resourceBundleURL = resourceBundleURL ?? resolveCoreResourceBundleURL() else {
-            return [:]
+        if let resourceBundleURL {
+            // Explicit resources are caller-owned fixtures/tools, not the process-wide app cache.
+            return loadLocalizationTable(language: language, resourceBundleURL: resourceBundleURL)
         }
+        return defaultStore.localizationTable(language: language)
+    }
 
+    static func loadLocalizationTable(language: String, resourceBundleURL: URL) -> [String: String] {
         for subdirectory in ["\(language).lproj", "\(language.lowercased()).lproj"] {
             let url = resourceBundleURL
                 .appendingPathComponent(subdirectory, isDirectory: true)
@@ -83,16 +80,43 @@ public enum AppLocalization {
         additionalSearchURLs: [URL]? = nil,
         fileManager: FileManager = .default
     ) -> URL? {
+        resolveCoreResourceBundleURL(
+            mainBundleURL: mainBundleURL,
+            mainResourceURL: mainResourceURL,
+            additionalSearchURLs: { additionalSearchURLs ?? defaultAdditionalSearchURLs() },
+            fileManager: fileManager
+        )
+    }
+
+    static func resolveCoreResourceBundleURL(
+        mainBundleURL: URL,
+        mainResourceURL: URL?,
+        additionalSearchURLs: () -> [URL],
+        fileManager: FileManager = .default
+    ) -> URL? {
+        let packagedCandidates = resourceBundleCandidates(
+            mainBundleURL: mainBundleURL,
+            mainResourceURL: mainResourceURL
+        )
+
+        func firstExistingBundle(in candidates: [URL]) -> URL? {
+            candidates.first { url in
+                var isDirectory: ObjCBool = false
+                return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+            }
+        }
+
+        if let packagedBundle = firstExistingBundle(in: packagedCandidates) {
+            return packagedBundle
+        }
+
+        // Development discovery can enumerate .build; only evaluate it after packaged paths miss.
         let candidates = resourceBundleCandidates(
             mainBundleURL: mainBundleURL,
             mainResourceURL: mainResourceURL,
-            additionalSearchURLs: additionalSearchURLs ?? defaultAdditionalSearchURLs()
+            additionalSearchURLs: additionalSearchURLs()
         )
-
-        return candidates.first { url in
-            var isDirectory: ObjCBool = false
-            return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
-        }
+        return firstExistingBundle(in: candidates)
     }
 
     public static func resourceBundleCandidates(
@@ -171,5 +195,46 @@ public enum AppLocalization {
             let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             return lhsDate > rhsDate
         }
+    }
+}
+
+// One store owns one immutable resource location; tests can create isolated stores.
+final class LocalizationStore {
+    private let lock = NSLock()
+    private let resourceBundleResolver: () -> URL?
+    private let tableLoader: (String, URL) -> [String: String]
+    private var didResolveResourceBundle = false
+    private var resourceBundleURL: URL?
+    private var tables: [String: [String: String]] = [:]
+
+    init(resourceBundleResolver: @escaping () -> URL?,
+         tableLoader: @escaping (String, URL) -> [String: String]) {
+        self.resourceBundleResolver = resourceBundleResolver
+        self.tableLoader = tableLoader
+    }
+
+    func localized(_ key: String, language: String) -> String {
+        for code in [language, AppLocalization.fallbackLanguageCode, AppLocalization.defaultLanguageCode] {
+            if let value = localizationTable(language: code)[key] {
+                return value
+            }
+        }
+        return key
+    }
+
+    func localizationTable(language: String) -> [String: String] {
+        lock.lock()
+        defer { lock.unlock() }
+        if let table = tables[language] {
+            return table
+        }
+        if !didResolveResourceBundle {
+            resourceBundleURL = resourceBundleResolver()
+            didResolveResourceBundle = true
+        }
+        // Cache misses and empty tables too. Resource files are immutable during an app run.
+        let table = resourceBundleURL.map { tableLoader(language, $0) } ?? [:]
+        tables[language] = table
+        return table
     }
 }
