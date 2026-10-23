@@ -8,9 +8,12 @@ final class CountdownLifecycleTests: XCTestCase {
         guard let fixtureHome = ProcessInfo.processInfo.environment["TWENTYGUARD_LIFECYCLE_TEST_HOME"] else {
             throw XCTSkip("Run make test-lifecycle to initialize AppDelegate only inside an isolated profile")
         }
-        XCTAssertEqual(NSHomeDirectory(), fixtureHome)
-        XCTAssertTrue(fixtureHome.hasPrefix(FileManager.default.temporaryDirectory.path))
-        XCTAssertNil(UserDefaults.standard.persistentDomain(forName: "com.javengroup.twentyguard"))
+        guard NSHomeDirectory() == fixtureHome,
+              fixtureHome.hasPrefix(FileManager.default.temporaryDirectory.path),
+              UserDefaults.standard.persistentDomain(forName: "com.javengroup.twentyguard") == nil else {
+            XCTFail("Refusing to initialize AppDelegate without verified home and preference isolation")
+            return
+        }
 
         let defaults = UserDefaults.standard
         let oldArguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
