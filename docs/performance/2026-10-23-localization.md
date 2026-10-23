@@ -1,6 +1,6 @@
 # Countdown localization CPU regression: 2026-10-23
 
-This record supports review of the local 1.7.9 candidate against installed 1.7.8 (source baseline `3fb6fb7`). It is a local performance verification, pending coordinator review and installation. No push, merge, public release, or replacement of `/Applications/TwentyGuard.app` was performed.
+The measurements below compare the local 1.7.9 candidate against installed 1.7.8 (source baseline `3fb6fb7`). Coordinator review subsequently approved code commit `3fbf20152b3f3255e5b5cfc070223808f6dc964f`; the final section records landing and local installation. No public release or DMG upload was performed.
 
 ## Cause and change
 
@@ -111,4 +111,26 @@ git diff --check
 
 Stable-query and whole-app CPU acceptance passed for the measured countdown state. This does not establish long-duration battery consumption or every break/night/overlay state. Activity Monitor's historical 12-hour Energy Impact was not used for acceptance. Default caches intentionally live for the app process; replacing bundled resources in a running process requires restart. Explicit fixture reads remain live and independent.
 
-Coordinator review is still required before installing, pushing, merging, or publishing the candidate.
+The measurements above were captured before coordinator review and local installation. The following delivery record supersedes that pending status.
+
+
+## Approved landing and local installation
+
+Coordinator review approved `3fbf20152b3f3255e5b5cfc070223808f6dc964f` after independent source review, 7 passing cache tests, inspection of the isolation harness/JSON, and independent calibration of the sampler's Mach tick conversion. The primary checkout fast-forwarded `main` from `3fb6fb7` to that exact commit, pushed normally, and confirmed the remote `main` SHA. No code changed during landing.
+
+`make install` rebuilt and replaced the installed app through the standard Makefile path; `make launch` started **one** process from `/Applications/TwentyGuard.app/Contents/MacOS/TwentyGuard` (verified PID 15640). Installed Info.plist and bundled version history both identify **1.7.9**. The installed executable matches the freshly built executable, SHA-256 `2e2f6f75e8f3fe69bea60029ba8eb9e1a9cbfa8f92fe47bb553b29e5cf5e7d7f`. Both built and installed bundles passed structural checks; the installed signature passed strict verification.
+
+Real-data verification compared the pre-install snapshot with the running installed app:
+
+- All **15 preference keys/values** are identical.
+- All **3,943 preexisting session rows** and **63 preexisting stats-event rows** remain byte-for-value identical; startup added one normal app-launch stats event (64 total).
+- All **140 existing JSONL files** retain their entire previous contents; normal startup/snapshot records may append.
+- SQLite `quick_check` returns `ok`.
+- The existing work start time, `2026-10-23T18:00:37+0800`, custom work/break durations and active/unpaused state were preserved, with refreshed session snapshots.
+- `lsof` confirms this installed instance opens the original product DB/WAL/SHM, and its environment contains no `CFFIXED_USER_HOME` test override.
+
+The installed app was measured with the user's retained settings and real data, separately from the controlled comparison above. Three consecutive 5-second windows after initial startup were **0.718888%, 0.587601%, and 0.563310% CPU** (mean 0.623266%), with 26, 26 and 25 interrupt wakeups, and no package idle wakeups. These are additional observations of the installed app, not a replacement denominator for the matched old/new experiment.
+
+Installation evidence, the pre-install SQLite backup and preference/session snapshots, Makefile installation log, integrity comparison and installed-process metrics are saved in `build/performance/2026-10-23-localization/install/`. The installer did not clear or migrate user data. The build was locally ad-hoc signed; public Developer ID distribution/notarization was not requested or performed.
+
+The native UI automation binding for this menu-bar app timed out, so the About window was not visually inspected. Its version data source, installed bundle metadata, process path, restored session, timer snapshots, data preservation, resources and signature were verified directly. The long-duration battery and historical Energy Impact limits above remain applicable.
