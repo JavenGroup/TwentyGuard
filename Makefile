@@ -22,6 +22,9 @@ run:
 test:
 	swift test $(SWIFT_BUILD_FLAGS) $(TEST_FLAGS)
 
+test-lifecycle:
+	SWIFT_BUILD_FLAGS='$(SWIFT_BUILD_FLAGS)' python3 scripts/test-countdown-lifecycle.py
+
 benchmark-localization:
 	@mkdir -p build
 	swiftc -O Sources/TwentyGuardCore/AppLocalization.swift scripts/LocalizationBenchmark/main.swift -o build/localization-benchmark
@@ -158,4 +161,4 @@ launch:
 	@echo "🚀 Launching app from Applications..."
 	@open "$(INSTALL_APP)"
 
-.PHONY: build run test benchmark-localization clean build-app verify-app-bundle verify-dmg check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch
+.PHONY: build run test test-lifecycle benchmark-localization clean build-app verify-app-bundle verify-dmg check-release-prereqs notary-store-credentials build-app-release dmg dmg-release notarize staple release-verify release install launch

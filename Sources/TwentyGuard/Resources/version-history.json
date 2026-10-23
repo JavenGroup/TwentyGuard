@@ -7,8 +7,17 @@
     "email": "javen.out@gmail.com",
     "github": "JavenGroup/TwentyGuard"
   },
-  "current_version": "1.7.9",
+  "current_version": "1.7.10",
   "versions": [
+    {
+      "version": "1.7.10",
+      "date": "2026-10-24",
+      "changes": [
+        "Show ordinary work countdowns in minutes, returning to seconds for the final minute, while keeping open menus and break overlays updated every second",
+        "Schedule work, break, postpone and night boundaries independently from display refreshes, including clock/time-zone changes and restored sessions",
+        "Cache the status icon and avoid refreshing closed menus; keep ten-second session snapshots and existing preferences"
+      ]
+    },
     {
       "version": "1.7.9",
       "date": "2026-10-23",

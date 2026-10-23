@@ -1,7 +1,7 @@
 # TwentyGuard - 技术架构文档
 
-> **文档版本**: v1.7.9
-> **最后更新**: 2026-10-23
+> **文档版本**: v1.7.10
+> **最后更新**: 2026-10-24
 > **维护者**: Javen Fang (@javenfang)
 
 ---
@@ -122,7 +122,7 @@ Sources/TwentyGuard/
 - 夜间禁用和正式破例状态管理
 
 **关键设计**:
-- 使用三种 Timer：工作/休息/状态快照
+- 使用独立的一次性到期调度和可见界面刷新 timer，另保留每 10 秒状态快照
 - 使用绝对时间 `Date` 记录会话开始时间
 - 通过计算属性实时计算剩余时间（避免累积误差）
 - ⭐ v1.2.0 更新：默认模式推迟总计最多 5 分钟，自定义模式可选 5/10 分钟
@@ -362,19 +362,19 @@ stateDiagram-v2
 
 ### 4.2 计时器调度策略
 
-**三种计时器**:
-1. **workTimer**: 工作期间每秒触发，更新UI和检查完成条件
-2. **breakTimer**: 休息期间每秒触发，更新倒计时
-3. **stateSnapshotTimer**: 每10秒记录状态快照
+**到期与显示分离**：
+- `CountdownTiming` 根据绝对结束时间规划到期动作与下一次显示变化，`CountdownScheduler` 最多持有一个到期 timer 和一个显示 timer。
+- 到期 timer 处理工作/休息/推迟/临时禁用结束，以及夜间收紧各阶段、锁定/解锁与破例到期；显示回调只更新界面及下一次显示时间，不执行或替换待处理的到期动作。
+- 普通工作状态栏按向上取整的分钟更新，最后 60 秒恢复秒数。菜单展开、休息遮罩和原有特殊状态倒计时保持秒级；隐藏倒计时且菜单收起时，不为普通工作创建显示 timer。
+- 状态栏图标按进程缓存并只设置一次；收起的菜单不刷新文字。显示内容未变化时不重复赋状态栏标题。
+- 到期、显示和 10 秒快照 timer 加入 common/event-tracking RunLoop mode，避免菜单追踪阻塞到期和可见倒计时。
+- 每 10 秒的 `stateSnapshotTimer` 保留日志与会话 JSON 保存；睡眠/锁屏仍立即保存 paused 标记，唤醒仍开启新工作周期。
+- 调时、时区和日期变化通知会重建两项夜间策略使用的 Calendar，取消旧 timer，立即重新检查状态并规划新边界。
+- 会话恢复和状态转换统一重排同一对 timer，取消旧回调；不会同时保留恢复前的推迟 timer 和新的工作显示 timer。
 
-**启动时机**:
-- `workTimer`: `startWorkTimer()` / `restartWorkTimer()`
-- `breakTimer`: `startBreakTimer()`
-- `stateSnapshotTimer`: 应用启动时 ([`AppDelegate.swift:261`](../Sources/TwentyGuard/AppDelegate.swift#L261))
+**验证诊断**：仅隔离测量时可设置 `TWENTYGUARD_TIMING_PROBE=1`，在现有 10 秒快照和到期回调输出计数、计划时间与实际时间到标准错误。该环境变量不改变调度、偏好或数据路径，默认关闭。
 
-**停止时机**:
-- 会话完成时立即停止对应计时器
-- 应用退出时停止所有计时器 ([`AppDelegate.swift:850-853`](../Sources/TwentyGuard/AppDelegate.swift#L850-L853))
+`make test` 运行常规回归；`make test-lifecycle` 在临时 `CFFIXED_USER_HOME` 和拒绝真实偏好/产品数据访问的沙盒中启动 AppDelegate，验证临时禁用期间的真实睡眠/唤醒方法仍保留到期调度。该用例在未隔离的常规测试进程中主动跳过。
 
 ### 4.3 推迟逻辑 ⭐ v1.1.0 更新
 
@@ -638,7 +638,7 @@ bundle 放错到 `.app` 根目录、`.DS_Store`、以及源码资产目录 `.xca
 <key>CFBundleInfoDictionaryVersion</key>
 <string>6.0</string>
 <key>CFBundleVersion</key>
-<string>1.7.9</string>
+<string>1.7.10</string>
 <key>LSMinimumSystemVersion</key>
 <string>12.0</string>
 ```
@@ -669,8 +669,8 @@ make release \
 - 发布产物: `dist/TwentyGuard-v1.5.3.dmg`
 - SHA-256: `322364e11c50a8ac7bccf71cceeeb136ff0bca338fb077b3664e53511be355cc`
 
-v1.7.9 当前为功能实现版本；公开分发前需要重新执行 `make release`，生成签名、
-公证并 staple 后的 `dist/TwentyGuard-v1.7.9.dmg`，再更新本节发布验证结果。
+v1.7.10 当前为功能实现版本；公开分发前需要重新执行 `make release`，生成签名、
+公证并 staple 后的 `dist/TwentyGuard-v1.7.10.dmg`，再更新本节发布验证结果。
 
 ### 8.4 版本管理
 
@@ -922,6 +922,7 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 | v1.7.7 | 2026-05-24 | 休息完成后强制进入新的 work session，并清理残留 postpone 状态；避免主动休息完成后沿用旧周期导致几分钟后再次休息；新增 SessionState 回归测试和对应 `session_debug` action |
 | v1.7.8 | 2026-05-24 | 系统暂停时立即闭合 active session，清空本地计时状态并持续保存 paused 标记；统计层按计划时长 + 推迟 + 宽限排除异常长 session，避免锁屏/屏保时间污染最长连续工作 |
 | v1.7.9 | 2026-10-23 | 缓存语言资源位置与各语言表，正式 app 优先查找并延迟开发目录发现，降低倒计时 CPU 开销；新增缓存、回退、并发及资源隔离回归测试 |
+| v1.7.10 | 2026-10-24 | 一次性动作 deadline 与可见刷新分离；普通工作分钟显示、最后 60 秒秒级；common/event-tracking 模式、时钟/时区重排与恢复 timer 去重；缓存图标并保留 10 秒快照 |
 
 ### B. 相关文档
 
@@ -937,5 +938,5 @@ du -h ~/Library/Application\ Support/com.javengroup.twentyguard/twentyguard_stat
 
 ---
 
-**最后更新**: 2026-10-23
-**文档版本**: v1.7.9
+**最后更新**: 2026-10-24
+**文档版本**: v1.7.10

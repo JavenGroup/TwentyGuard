@@ -110,6 +110,7 @@ public struct NightRestrictionStatus: Equatable, Sendable {
 }
 
 public struct NightRestrictionPolicy: Sendable {
+    private static let windDownRatios = [0.75, 0.50, 0.25]
     private let calendar: Calendar
 
     public init(calendar: Calendar = .current) {
@@ -175,10 +176,22 @@ public struct NightRestrictionPolicy: Sendable {
     }
 
     public static func windDownLimits(baseWorkDurationSeconds: Int) -> [Int] {
-        [0.75, 0.50, 0.25].map { ratio in
+        windDownRatios.map { ratio in
             let scaled = Int(Double(baseWorkDurationSeconds) * ratio)
             return max(5 * 60, (scaled / (5 * 60)) * (5 * 60))
         }
+    }
+
+    /// Includes every tightening stage, not just the eventual screen lock.
+    public func nextTransition(after now: Date, status: NightRestrictionStatus, isEnabled: Bool) -> Date? {
+        guard isEnabled, !status.isOverrideActive else { return nil }
+        let schedule = status.schedule
+        let stageDuration = schedule.lockStart.timeIntervalSince(schedule.windDownStart) / Double(Self.windDownRatios.count)
+        let stages = (1..<Self.windDownRatios.count).map {
+            schedule.windDownStart.addingTimeInterval(Double($0) * stageDuration)
+        }
+        return ([schedule.windDownStart, schedule.lockStart, schedule.unlockTime] + stages)
+            .filter { $0 > now }.min()
     }
 
     private func relevantSchedule(now: Date, settings: NightRestrictionSettings) -> NightRestrictionSchedule {

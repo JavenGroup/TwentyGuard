@@ -3,6 +3,12 @@ import ServiceManagement
 import TwentyGuardCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private let checkSingleInstanceOnLaunch: Bool
+
+    init(checkSingleInstanceOnLaunch: Bool = true) {
+        self.checkSingleInstanceOnLaunch = checkSingleInstanceOnLaunch
+        super.init()
+    }
     private enum AppIdentity {
         static let displayName = "TwentyGuard"
         static let bundleIdentifier = "com.javengroup.twentyguard"
@@ -27,12 +33,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusBarItem: NSStatusItem!
     private var menu: NSMenu!
-    private var workTimer: Timer?
-    private var breakTimer: Timer?
-    private var nightLockTimer: Timer?
-    private var temporaryDisableTimer: Timer?
-    private var menuUpdateTimer: Timer?
     private var stateSnapshotTimer: Timer?
+    private var schedulingReady = false
+    private var displaysAreActive = true
+    private var menuIsOpen = false
+    private let timingProbeEnabled = ProcessInfo.processInfo.environment["TWENTYGUARD_TIMING_PROBE"] == "1"
+    private lazy var countdownScheduler: CountdownScheduler = {
+        let scheduler = CountdownScheduler()
+        scheduler.onDeadline = { [weak self] in self?.handleCountdownDeadline() }
+        scheduler.onDisplay = { [weak self] in self?.refreshCountdownDisplayAndTimer() }
+        return scheduler
+    }()
+    private lazy var statusBarIcon: NSImage? = {
+        let icon = loadStatusBarIcon() ?? NSImage(systemSymbolName: "eye", accessibilityDescription: "TwentyGuard")
+        icon?.isTemplate = true
+        return icon
+    }()
     
     // 绝对时间记录
     private var workSessionStartTime: Date?
@@ -72,8 +88,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var showCountdownMenuItem: NSMenuItem!
 
     // Night restriction settings
-    private let nightPolicy = NightRestrictionPolicy()
-    private let nightOverridePolicy = NightOverridePolicy()
+    private var nightPolicy = NightRestrictionPolicy()
+    private var nightOverridePolicy = NightOverridePolicy()
     private let temporaryDisablePolicy = TemporaryDisablePolicy()
     private var nightRestrictionSettings = NightRestrictionSettings()
     private var nightOverrideState: NightOverrideState?
@@ -145,7 +161,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 检查是否已有实例运行
-        if !checkSingleInstance() {
+        if checkSingleInstanceOnLaunch && !checkSingleInstance() {
             NSApp.terminate(nil)
             return
         }
@@ -154,6 +170,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         setupMenu()
         setupSystemNotifications()
+        schedulingReady = true
         
         // 记录应用启动
         eventRecorder.recordAppLaunch()
@@ -173,6 +190,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 启动状态快照计时器（每10秒记录一次状态）
         startStateSnapshotTimer()
         _ = applyNightRestrictionState(reason: "app_launch")
+        rescheduleCountdown()
     }
     
     private func checkSingleInstance() -> Bool {
@@ -385,17 +403,128 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startUIUpdateTimer() {
-        if isTemporaryDisableActive {
-            startTemporaryDisableTimer()
+        rescheduleCountdown()
+    }
+
+    private func remainingWorkTime(at now: Date, status: NightRestrictionStatus) -> TimeInterval {
+        guard let start = workSessionStartTime else { return TimeInterval(status.effectiveWorkDurationSeconds) }
+        return max(0, TimeInterval(status.effectiveWorkDurationSeconds) - now.timeIntervalSince(start))
+    }
+
+    private func countdownPlan(now: Date, status: NightRestrictionStatus) -> CountdownPlan {
+        let phase: CountdownPhase
+        if status.isLocked {
+            phase = .nightLocked(until: status.schedule.unlockTime)
+        } else if let state = temporaryDisableState {
+            phase = .temporarilyDisabled(until: state.until)
+        } else if let start = postponeStartTime {
+            phase = .postponed(until: start.addingTimeInterval(postponeDuration))
+        } else if let start = breakSessionStartTime {
+            phase = .rest(until: start.addingTimeInterval(TimeInterval(currentBreakDuration)))
+        } else if let start = workSessionStartTime {
+            phase = .work(until: start.addingTimeInterval(TimeInterval(status.effectiveWorkDurationSeconds)))
+        } else {
+            phase = .paused
+        }
+        return CountdownTiming.plan(
+            now: now, phase: phase,
+            nightTransition: nightPolicy.nextTransition(after: now, status: status, isEnabled: nightRestrictionSettings.isEnabled),
+            overrideUntil: nightOverrideState?.until,
+            showStatusCountdown: showCountdownInStatusBar,
+            menuIsOpen: menuIsOpen, displaysAreActive: displaysAreActive
+        )
+    }
+
+    private func rescheduleCountdown() {
+        guard schedulingReady else { return }
+        let now = Date()
+        let status = currentNightStatus(now: now)
+        refreshCountdownDisplay(now: now, status: status)
+        countdownScheduler.schedule(countdownPlan(now: now, status: status))
+    }
+
+    private func refreshCountdownDisplayAndTimer() {
+        guard schedulingReady else { return }
+        let now = Date()
+        let status = currentNightStatus(now: now)
+        refreshCountdownDisplay(now: now, status: status)
+        // Display work never replaces a pending action, even if both fire at the same instant.
+        countdownScheduler.scheduleDisplay(countdownPlan(now: now, status: status).display)
+    }
+
+    private func refreshCountdownDisplay(now: Date, status: NightRestrictionStatus) {
+        guard displaysAreActive else { return }
+        if let start = breakSessionStartTime {
+            let remaining = CountdownTiming.secondsRemaining(until: start.addingTimeInterval(TimeInterval(currentBreakDuration)), now: now)
+            for overlay in breakOverlays { overlay.updateCountdown(remaining) }
+        }
+        if status.isLocked {
+            for overlay in nightLockOverlays {
+                overlay.update(unlockTime: status.schedule.unlockTime, now: now, recoveryFormat: localized("nightOverrideRecoveryFormat"))
+            }
+        }
+        if breakSessionStartTime == nil || status.isLocked || status.isOverrideActive {
+            updateStatusBarTitle(now: now, status: status)
+        }
+        updateMenuTimer(now: now, status: status)
+        if menuIsOpen { updateTemporaryDisableMenuItem() }
+    }
+
+    private func handleCountdownDeadline() {
+        traceCountdownTiming(event: "deadline")
+        clearExpiredNightOverride()
+        if temporaryDisableState != nil {
+            updateTemporaryDisableTimer()
+        } else if !nightLockOverlays.isEmpty {
+            updateNightLockTimer()
+        } else if !displaysAreActive {
+            _ = applyNightRestrictionState(reason: "scheduled_while_paused")
+        } else if postponeStartTime != nil {
+            updatePostponeTimer()
+        } else if breakSessionStartTime != nil {
+            updateBreakTimer()
+        } else if workSessionStartTime != nil {
+            updateWorkTimer()
+        } else {
+            _ = applyNightRestrictionState(reason: "scheduled_boundary")
+        }
+        rescheduleCountdown()
+    }
+
+    @objc private func systemClockOrTimeZoneChanged() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.systemClockOrTimeZoneChanged() }
             return
         }
-
-        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateWorkTimer()
-        }
-        updateStatusBarTitle()
-        updateMenuTimer()
+        // Both policies capture a Calendar. Recreating them matters after a time-zone change.
+        nightPolicy = NightRestrictionPolicy()
+        nightOverridePolicy = NightOverridePolicy()
+        guard schedulingReady else { return }
+        countdownScheduler.cancel()
+        handleCountdownDeadline()
     }
+
+    private func traceCountdownTiming(event: String) {
+        guard timingProbeEnabled else { return }
+        let now = String(format: "%.6f", Date().timeIntervalSince1970)
+        let planned = String(format: "%.6f", countdownScheduler.lastFiredDeadline?.timeIntervalSince1970 ?? 0)
+        let line = "[TimingProbe] event=\(event) now=\(now) planned=\(planned) deadline_callbacks=\(countdownScheduler.deadlineFireCount) display_callbacks=\(countdownScheduler.displayFireCount) title=\(statusBarItem.button?.title ?? "") menu_open=\(menuIsOpen)\n"
+        FileHandle.standardError.write(Data(line.utf8))
+    }
+
+    #if DEBUG
+    var countdownScheduleForTesting: CountdownPlan { countdownScheduler.scheduledPlan }
+
+    func stopCountdownForTesting() {
+        schedulingReady = false
+        countdownScheduler.cancel()
+        stateSnapshotTimer?.invalidate()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
+        if let item = statusBarItem { NSStatusBar.system.removeStatusItem(item) }
+    }
+    #endif
     
     private func loadSettings() {
         showCountdownInStatusBar = UserDefaults.standard.bool(forKey: "showCountdownInStatusBar")
@@ -480,6 +609,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusBarItem.button {
+            button.image = statusBarIcon
             button.action = #selector(statusBarButtonClicked)
             button.target = self
         }
@@ -566,6 +696,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupSystemNotifications() {
         let notificationCenter = NSWorkspace.shared.notificationCenter
+        for name in [NSNotification.Name.NSSystemClockDidChange, .NSSystemTimeZoneDidChange, .NSCalendarDayChanged] {
+            NotificationCenter.default.addObserver(self, selector: #selector(systemClockOrTimeZoneChanged), name: name, object: nil)
+        }
         
         // Listen for system sleep/wake notifications
         notificationCenter.addObserver(
@@ -982,6 +1115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = applyNightRestrictionState(reason: "night_setting_toggle")
         updateMenuTimer()
         updateStatusBarTitle()
+        rescheduleCountdown()
     }
 
     @objc private func selectNightWindDownStart(_ sender: NSMenuItem) {
@@ -992,6 +1126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = applyNightRestrictionState(reason: "night_wind_down_changed")
         updateMenuTimer()
         updateStatusBarTitle()
+        rescheduleCountdown()
     }
 
     @objc private func selectNightLockStart(_ sender: NSMenuItem) {
@@ -1004,6 +1139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = applyNightRestrictionState(reason: "night_lock_start_changed")
         updateMenuTimer()
         updateStatusBarTitle()
+        rescheduleCountdown()
     }
 
     @objc private func selectNightUnlockTime(_ sender: NSMenuItem) {
@@ -1013,6 +1149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = applyNightRestrictionState(reason: "night_unlock_changed")
         updateMenuTimer()
         updateStatusBarTitle()
+        rescheduleCountdown()
     }
 
     @objc private func statusBarButtonClicked() {
@@ -1038,7 +1175,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 使用新的事件记录器
         eventRecorder.endWorkSession()
 
-        workTimer?.invalidate()
+        countdownScheduler.cancel()
         showBreakOverlay()
     }
     
@@ -1241,7 +1378,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleShowCountdown() {
         showCountdownInStatusBar.toggle()
         updateShowCountdownState()
-        updateStatusBarTitle()
+        refreshCountdownDisplayAndTimer()
         saveSettings()
     }
     
@@ -1303,11 +1440,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 使用新的事件记录器
         eventRecorder.recordAppTermination()
         
-        workTimer?.invalidate()
-        breakTimer?.invalidate()
-        nightLockTimer?.invalidate()
-        temporaryDisableTimer?.invalidate()
-        menuUpdateTimer?.invalidate()
+        countdownScheduler.cancel()
         stateSnapshotTimer?.invalidate()
         for overlay in nightLockOverlays {
             overlay.hideOverlay()
@@ -1317,6 +1450,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Clean up notification observers
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
         
         NSApplication.shared.terminate(nil)
     }
@@ -1371,6 +1505,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateCustomModeSubItems()
         updateModeMenuStates()
         saveSettings()
+        rescheduleCountdown()
     }
 
     @objc private func selectPostponeLimit(_ sender: NSMenuItem) {
@@ -1407,7 +1542,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func restartWorkTimer() {
+        guard displaysAreActive else { rescheduleCountdown(); return }
         if applyNightRestrictionState(reason: "restart_work_timer") {
+            rescheduleCountdown()
             return
         }
 
@@ -1433,14 +1570,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventRecorder.startWorkSession(duration: effectiveWorkDuration)
         
         // 启动UI更新计时器
-        workTimer?.invalidate()
-        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateWorkTimer()
-        }
+        rescheduleCountdown()
     }
     
     private func startWorkTimer(forceFreshSession: Bool = false) {
+        guard displaysAreActive else { rescheduleCountdown(); return }
         if applyNightRestrictionState(reason: "start_work_timer") {
+            rescheduleCountdown()
             return
         }
 
@@ -1492,10 +1628,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         saveCurrentSessionState()
         
         // 启动UI更新计时器
-        workTimer?.invalidate()
-        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateWorkTimer()
-        }
+        rescheduleCountdown()
     }
     
     private func updateWorkTimer() {
@@ -1503,15 +1636,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        updateMenuTimer()
-        updateStatusBarTitle()
+        // Display updates are scheduled independently of these due actions.
 
         // 检查推迟时间是否结束
         if postponeStartTime != nil && postponeTimeRemaining <= 0 {
             // 推迟时间结束，清除推迟状态，开始正常休息
             print("⏰ Postpone time finished, showing break overlay")
-            workTimer?.invalidate()
-            workTimer = nil
+            countdownScheduler.cancel()
             postponeStartTime = nil
             postponeDuration = 0
             showBreakOverlay()
@@ -1528,11 +1659,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCompletingWorkSession = true
         
         // 首先停止定时器，无论后续操作是否成功
-        workTimer?.invalidate()
-        workTimer = nil
+        countdownScheduler.cancel()
 
         if applyNightRestrictionState(reason: "complete_work_session") {
             isCompletingWorkSession = false
+            rescheduleCountdown()
             return
         }
         
@@ -1548,36 +1679,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCompletingWorkSession = false
     }
     
-    private func updateStatusBarTitle() {
-        if let button = statusBarItem.button {
-            // Try to load custom status bar icon from SPM bundle resources
-            if let statusIcon = loadStatusBarIcon() {
-                statusIcon.isTemplate = true // This makes it adapt to dark/light mode
-                button.image = statusIcon
+    private func updateStatusBarTitle(now: Date = Date(), status: NightRestrictionStatus? = nil) {
+        guard let button = statusBarItem.button else { return }
+        let nightStatus = status ?? currentNightStatus(now: now)
+        let title: String
+        if nightStatus.isOverrideActive, let state = nightOverrideState {
+            title = " " + localized("nightOverrideActiveStatus") + " " + formatStatusBarTime(CountdownTiming.secondsRemaining(until: state.until, now: now))
+        } else if nightStatus.isLocked {
+            title = " " + localized("nightLockedStatus")
+        } else if isTemporaryDisableActive {
+            title = " " + localized("temporaryDisableActiveStatus") + " " + formatStatusBarTime(temporaryDisableRemainingSeconds)
+        } else if showCountdownInStatusBar {
+            if let start = postponeStartTime {
+                title = " " + formatStatusBarTime(CountdownTiming.secondsRemaining(until: start.addingTimeInterval(postponeDuration), now: now))
             } else {
-                // Fallback to system symbol if custom icon not found
-                button.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "TwentyGuard")
-            }
-            
-            let nightStatus = currentNightStatus()
-
-            if nightStatus.isOverrideActive, let state = nightOverrideState {
-                button.title = " " + localized("nightOverrideActiveStatus") + " " + formatStatusBarTime(Int(max(0, state.until.timeIntervalSince(Date()))))
-            } else if nightStatus.isLocked {
-                button.title = " " + localized("nightLockedStatus")
-            } else if isTemporaryDisableActive {
-                button.title = " " + localized("temporaryDisableActiveStatus") + " " + formatStatusBarTime(temporaryDisableRemainingSeconds)
-            } else if showCountdownInStatusBar {
-                // 如果处于推迟状态，显示推迟倒计时
-                if isPostponeActive {
-                    button.title = " " + formatStatusBarTime(Int(postponeTimeRemaining))
+                let remaining = remainingWorkTime(at: now, status: nightStatus)
+                if workSessionStartTime != nil, remaining > 60 {
+                    title = " \(Int(ceil(remaining / 60))) \(localized("minutes"))"
                 } else {
-                    button.title = " " + formatStatusBarTime(Int(workTimeRemaining))
+                    title = " " + formatStatusBarTime(Int(ceil(remaining)))
                 }
-            } else {
-                button.title = ""
             }
+        } else {
+            title = ""
         }
+        if button.title != title { button.title = title }
     }
     
     private func loadStatusBarIcon() -> NSImage? {
@@ -1645,8 +1771,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentNightStatus(now: Date = Date()) -> NightRestrictionStatus {
-        clearExpiredNightOverride(now: now)
-        return nightPolicy.status(
+        nightPolicy.status(
             now: now,
             baseWorkDurationSeconds: currentWorkDuration,
             settings: nightRestrictionSettings,
@@ -1686,6 +1811,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @discardableResult
     private func applyNightRestrictionState(reason: String) -> Bool {
+        clearExpiredNightOverride()
         let status = currentNightStatus()
 
         if temporaryDisableState != nil,
@@ -1745,12 +1871,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeHealthStatsWindowIfNeeded()
         cleanupBreakOverlays()
 
-        workTimer?.invalidate()
-        workTimer = nil
-        breakTimer?.invalidate()
-        breakTimer = nil
-        menuUpdateTimer?.invalidate()
-        menuUpdateTimer = nil
+        countdownScheduler.cancel()
 
         if let startTime = workSessionStartTime {
             let elapsed = Date().timeIntervalSince(startTime)
@@ -1792,27 +1913,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startNightLockTimer() {
-        nightLockTimer?.invalidate()
-        nightLockTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateNightLockTimer()
-        }
+        rescheduleCountdown()
     }
 
     private func updateNightLockTimer() {
-        let status = currentNightStatus()
-
-        if case .locked(let unlockTime) = status.phase {
-            for overlay in nightLockOverlays {
-                overlay.update(unlockTime: unlockTime, now: Date(), recoveryFormat: localized("nightOverrideRecoveryFormat"))
-            }
-        } else {
+        if !currentNightStatus().isLocked {
             leaveNightLock(startFreshWorkSession: true)
         }
     }
 
     private func leaveNightLock(startFreshWorkSession: Bool) {
-        nightLockTimer?.invalidate()
-        nightLockTimer = nil
+        countdownScheduler.cancel()
 
         for overlay in nightLockOverlays {
             overlay.hideOverlay()
@@ -1825,6 +1936,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if startFreshWorkSession, workSessionStartTime == nil, breakSessionStartTime == nil {
             startWorkTimer()
         }
+        rescheduleCountdown()
     }
 
     private func refreshNightLockOverlays() {
@@ -1879,8 +1991,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - Helper Methods
     
-    private func updateMenuTimer() {
-        let nightStatus = currentNightStatus()
+    private func updateMenuTimer(now: Date = Date(), status: NightRestrictionStatus? = nil) {
+        guard menuIsOpen else { return }
+        let nightStatus = status ?? currentNightStatus(now: now)
 
         if nightStatus.isOverrideActive, let state = nightOverrideState {
             timerMenuItem.title = "\(localized("nightOverrideActiveStatus")) · \(formatStatusBarTime(Int(max(0, state.until.timeIntervalSince(Date())))))"
@@ -1899,7 +2012,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             formatter.dateFormat = "HH:mm"
             timerMenuItem.title = "\(localized("nightWindDownStatus")): \(formatStatusBarTime(Int(workTimeRemaining))) · \(formatter.string(from: lockStart)) \(localized("nightLockStart"))"
         } else {
-            timerMenuItem.title = formatWorkTime(workTimeRemaining)
+            timerMenuItem.title = formatWorkTime(remainingWorkTime(at: now, status: nightStatus))
         }
     }
     
@@ -1954,10 +2067,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         saveTemporaryDisableState()
         eventRecorder.recordTemporaryDisableStarted(state: state, reason: reason)
 
-        workTimer?.invalidate()
-        workTimer = nil
-        breakTimer?.invalidate()
-        breakTimer = nil
+        countdownScheduler.cancel()
 
         if !breakOverlays.isEmpty {
             cleanupBreakOverlays()
@@ -1977,20 +2087,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startTemporaryDisableTimer() {
-        temporaryDisableTimer?.invalidate()
         updateTemporaryDisableMenuItem()
-        updateStatusBarTitle()
-        updateMenuTimer()
-
-        temporaryDisableTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateTemporaryDisableTimer()
-        }
+        rescheduleCountdown()
     }
 
     private func updateTemporaryDisableTimer() {
         guard let state = temporaryDisableState else {
-            temporaryDisableTimer?.invalidate()
-            temporaryDisableTimer = nil
+            countdownScheduler.cancel()
             return
         }
 
@@ -2006,16 +2109,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        updateTemporaryDisableMenuItem()
-        updateStatusBarTitle()
-        updateMenuTimer()
     }
 
     private func finishTemporaryDisable(reason: String, startFreshWorkSession: Bool) {
         guard let state = temporaryDisableState else { return }
 
-        temporaryDisableTimer?.invalidate()
-        temporaryDisableTimer = nil
+        countdownScheduler.cancel()
         temporaryDisableState = nil
         saveTemporaryDisableState()
         eventRecorder.recordTemporaryDisableEnded(state: state, reason: reason)
@@ -2026,11 +2125,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if startFreshWorkSession {
             startWorkTimer()
         }
+        rescheduleCountdown()
     }
 
     private func expireTemporaryDisable(_ state: TemporaryDisableState, startFreshWorkSession: Bool) {
-        temporaryDisableTimer?.invalidate()
-        temporaryDisableTimer = nil
+        countdownScheduler.cancel()
         temporaryDisableState = nil
         saveTemporaryDisableState()
         eventRecorder.recordTemporaryDisableExpired(state: state)
@@ -2041,13 +2140,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if startFreshWorkSession {
             startWorkTimer()
         }
+        rescheduleCountdown()
     }
     
     private func startStateSnapshotTimer() {
         stateSnapshotTimer?.invalidate()
-        stateSnapshotTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 10.0, repeats: true) { [weak self] _ in
             self?.recordStateSnapshot()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: .eventTracking)
+        stateSnapshotTimer = timer
     }
     
     private func stopStateSnapshotTimer() {
@@ -2068,12 +2171,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 同时保存会话状态
         saveCurrentSessionState()
+        traceCountdownTiming(event: "snapshot")
     }
     
     private func showBreakOverlay() {
         print("🎭 showBreakOverlay 被调用")
 
         if applyNightRestrictionState(reason: "before_break_overlay") {
+            rescheduleCountdown()
             return
         }
 
@@ -2145,18 +2250,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startBreakTimer() {
-        breakTimer?.invalidate()
-        breakTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateBreakTimer()
-        }
+        rescheduleCountdown()
     }
     
     private func updateBreakTimer() {
         if applyNightRestrictionState(reason: "break_timer_tick") {
             return
         }
-
-        let remaining = Int(breakTimeRemaining)
 
         // 检测异常情况：如果休息时间已经超过预期很多，可能是系统睡眠导致的
         if let breakStart = breakSessionStartTime {
@@ -2167,11 +2267,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 completeBreakSession()
                 return
             }
-        }
-
-        // 更新所有窗口的倒计时
-        for overlay in breakOverlays {
-            overlay.updateCountdown(max(0, remaining)) // 确保不显示负数
         }
 
         // 正常完成休息
@@ -2185,8 +2280,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCompletingBreakSession = true
         
         // 首先停止定时器，无论后续操作是否成功
-        breakTimer?.invalidate()
-        breakTimer = nil
+        countdownScheduler.cancel()
         
         cleanupBreakOverlays()
         
@@ -2254,7 +2348,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventRecorder.recordPostpone(minutes: minutes)
         
         print("⏸️ 停止休息计时器")
-        breakTimer?.invalidate()
+        countdownScheduler.cancel()
         
         print("🧹 调用 cleanupBreakOverlays")
         cleanupBreakOverlays()
@@ -2278,24 +2372,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startPostponeTimer() {
-        workTimer?.invalidate()
-        workTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
+        rescheduleCountdown()
+    }
 
-            // 更新UI显示推迟倒计时
-            self.updateStatusBarTitle()
-            self.updateMenuTimer()
-
-            // 检查推迟时间是否结束
-            if self.postponeTimeRemaining <= 0 {
-                // 推迟时间结束，清除推迟状态，开始正常休息
-                self.workTimer?.invalidate()
-                self.workTimer = nil
-                self.postponeStartTime = nil
-                self.postponeDuration = 0
-                self.saveCurrentSessionState()
-                self.showBreakOverlay()
-            }
+    private func updatePostponeTimer() {
+        if applyNightRestrictionState(reason: "postpone_deadline") { return }
+        if postponeTimeRemaining <= 0 {
+            countdownScheduler.cancel()
+            postponeStartTime = nil
+            postponeDuration = 0
+            saveCurrentSessionState()
+            showBreakOverlay()
         }
     }
     
@@ -2350,10 +2437,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func pauseCurrentSession(reason: String) {
-        workTimer?.invalidate()
-        workTimer = nil
-        breakTimer?.invalidate()
-        breakTimer = nil
+        displaysAreActive = false
+        countdownScheduler.cancel()
         logSessionDebug("system_pause_current_session", context: [
             "reason": reason,
             "work_start_time": debugTimestamp(workSessionStartTime),
@@ -2394,9 +2479,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         totalPostponedTime = pausedState.totalPostponedTime
         isPausedBySystemEvent = pausedState.pausedBySystemEvent
         saveCurrentSessionState()
+        rescheduleCountdown()
     }
     
     private func evaluateAndResumeSession(reason: String) {
+        displaysAreActive = true
+        countdownScheduler.cancel()
         // 首先检查并清理任何残留的休息窗口
         logSessionDebug("system_resume_evaluate", context: [
             "reason": reason,
@@ -2428,8 +2516,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 清理定时器
-        breakTimer?.invalidate()
-        breakTimer = nil
+        countdownScheduler.cancel()
 
         // 重置为新的工作会话
         workSessionStartTime = nil
@@ -2523,6 +2610,7 @@ extension AppDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
+        menuIsOpen = true
         updateMenuTimer()
         updateLoginItemState()
         updateShowCountdownState()
@@ -2533,19 +2621,16 @@ extension AppDelegate: NSMenuDelegate {
     }
     
     func menuDidClose(_ menu: NSMenu) {
+        menuIsOpen = false
         stopMenuUpdateTimer()
     }
     
     private func startMenuUpdateTimer() {
-        stopMenuUpdateTimer()
-        menuUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateMenuTimer()
-        }
+        refreshCountdownDisplayAndTimer()
     }
     
     private func stopMenuUpdateTimer() {
-        menuUpdateTimer?.invalidate()
-        menuUpdateTimer = nil
+        refreshCountdownDisplayAndTimer()
     }
     
     @objc private func selectLanguage(_ sender: NSMenuItem) {
@@ -2568,5 +2653,6 @@ extension AppDelegate: NSMenuDelegate {
             overlay.setLocalizer(localized)
         }
         refreshNightLockOverlays()
+        refreshCountdownDisplayAndTimer()
     }
 }
